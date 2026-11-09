@@ -361,7 +361,7 @@ git switch -c TYPE/short-description
 
 - `git status` first: **Check** it says `nothing to commit, working tree clean`. Uncommitted changes would be carried onto the new branch and mixed into unrelated work. If there are leftovers, commit them on their own branch first, or ask before discarding them.
 - `git switch main` moves to the main branch.
-- `git pull` downloads new commits from GitHub and updates your main, so the branch starts from the latest code.
+- `git pull` downloads new commits from GitHub and updates your main, so the branch starts from the latest code. Run it even if `git switch main` says "up to date with 'origin/main'": that message compares against your last-fetched copy of GitHub, not GitHub itself.
 - `git switch -c NAME` creates a new branch from where you are and moves onto it (`-c` = create). Uncommitted files come with you.
 - Branch names: `TYPE/short-description`, lower case with hyphens. `chore/` setup and tooling, `feat/` new tests or features, `fix/` fixes, `docs/` docs only. Example: `feat/sign-in-tests`.
 - **Check:** `git status` shows `On branch TYPE/short-description`.
@@ -437,6 +437,7 @@ git log --oneline
 | `git log --oneline` | History, one line per commit. |
 | `git branch -a` | All branches: local, and remote-tracking (`remotes/origin/...`). |
 | `git diff` | Exact line changes not yet staged. `git diff --staged` for staged ones. |
+| `git diff --stat` | Summary only: each changed file and how many lines were added or removed. Quick sanity check before committing. |
 | `git restore FILE` | Throws away uncommitted changes to FILE (cannot be undone). |
 
 ## Troubleshooting
@@ -451,3 +452,4 @@ git log --oneline
 | `Playwright Host validation warning: Host system is missing dependencies! ... libwebp.dll` at the end of `npm init playwright@latest` | Windows is missing a library one of the downloaded browsers expects. The install still finishes with `Success!`. | Only WebKit is affected: its tests fail with `browserType.launch: Host system is missing dependencies! libwebp.dll`. Chromium and Firefox pass. No official Windows fix found (2026-11-09). Workaround: run locally with `--project=chromium --project=firefox`; CI runs on Ubuntu, where `npx playwright install --with-deps` installs WebKit's libraries. From Week 1 Day 2 the config is Chromium only. |
 | Windows Firewall popup on first `npx serve` | Node is opening a network port | Allow **Private networks** only. |
 | `warning: in the working copy of '...', LF will be replaced by CRLF the next time Git touches it` on `git add` | Git for Windows converts line endings: files use LF (Unix style) in the repo and CRLF (Windows style) on disk (`core.autocrlf=true`). | Harmless; the repo still stores LF. To be made consistent on Week 1 Day 2 with a `.gitattributes` file (`* text=auto eol=lf`), alongside Prettier. |
+| CI step "Install Playwright Browsers" runs for 10+ minutes (normally under a minute; whole job ~1 min) | The runner is stuck downloading a browser or Linux packages (`--with-deps` uses apt): a slow mirror or a network hang on GitHub's side, not your code. | Expand the step's log. If the last line hasn't changed for several minutes, click **Cancel workflow**, then **Re-run all jobs**. The workflow's `timeout-minutes: 60` would stop it eventually. Seen 2026-11-09: stuck in apt at `Get:109 ... libdecor-0-0` from azure.archive.ubuntu.com. If it keeps happening: cache browsers between runs, or run the job in the official Playwright Docker image (dependencies preinstalled). |
