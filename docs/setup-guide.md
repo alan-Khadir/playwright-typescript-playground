@@ -1,6 +1,5 @@
 # Setup guide
 
-
 This is the single record of how this framework is set up. It is written so that anyone can rebuild it from nothing on a new Windows machine, one step at a time.
 
 ## How to read this guide
@@ -311,20 +310,7 @@ From Week 1 Day 2 the config runs Chromium only; all three browsers return in th
 
 **Where:** VS Code terminal, in the repo root.
 
-Work goes on a branch and reaches `main` through a pull request (PR), merged only when GitHub Actions is green.
-
-**9a. Create a branch**
-
-```powershell
-git switch -c chore/playwright-setup
-```
-
-- `git switch` moves you to another branch; `-c` (create) makes the branch first. The new branch starts from the commit you are on (main), and your uncommitted files come with you.
-- Why a branch: `main` only receives work through a pull request, after CI is green. A broken change never lands on main.
-- Naming: `type/short-description`. `chore/` is for setup and tooling, `feat/` for new tests or features, `fix/` for fixes.
-- **Check:** the prompt or `git status` shows `On branch chore/playwright-setup`.
-
-**9b. Create docs/setup-guide.md (this guide)**
+This step follows the standard **Git workflow** (see that section below) with branch `chore/playwright-setup` and commit message `chore: set up Playwright with TypeScript, example tests and CI`. The one extra action on Day 1 is creating this guide, after the branch is made (workflow step 1) and before staging (workflow step 2):
 
 ```powershell
 New-Item -ItemType Directory -Force docs
@@ -334,37 +320,10 @@ code docs\setup-guide.md
 
 - `New-Item -ItemType Directory -Force docs` creates the `docs` folder in the repo root (`-Force`: no error if it already exists). All repo documents live here.
 - `New-Item docs\setup-guide.md` creates an empty file (`New-Item` without `-ItemType` creates a file).
-- `code docs\setup-guide.md` opens that file in the current VS Code window.
-- Paste the guide's content as **Markdown source** (lines starting `#`, tables made of `|`), not rendered text, and save with **Ctrl+S**.
-- Alternative if you have the guide as a downloaded `.md` file: `Copy-Item $HOME\Downloads\setup-guide-draft.md docs\setup-guide.md` copies it in directly (`$HOME` is your user folder, e.g. `C:\Users\you`). Adjust the file name to match the download.
-- **Check:** the Explorer panel shows `docs/setup-guide.md` with content.
+- `code docs\setup-guide.md` opens that file in the current VS Code window. Paste the guide as **Markdown source** (lines starting `#`, tables made of `|`), not rendered text, and save with **Ctrl+S**.
+- Alternative if you have the guide as a downloaded `.md` file: `Copy-Item $HOME\Downloads\setup-guide-draft.md docs\setup-guide.md` (`$HOME` is your user folder). Adjust the file name to match the download.
 
-**9c. Stage, check, commit and push**
-
-```powershell
-git add .
-git status
-git commit -m "chore: set up Playwright with TypeScript, example tests and CI"
-git push -u origin chore/playwright-setup
-```
-
-- `git add .` stages every new and changed file in the repo root (respecting .gitignore).
-- `git status` before committing: check that `node_modules/`, `test-results/` and `playwright-report/` are **not** listed.
-- `git commit -m "..."` saves the staged files as one commit with that message. Message format: `type: what changed`, in the imperative.
-- `git push -u origin NAME` uploads the branch to GitHub; `-u` links the local branch to it, so later pushes are just `git push`. The first push may open a browser window to sign in to GitHub (Git Credential Manager).
-
-Then in the browser:
-
-1. The push output prints a link (`Create a pull request for 'chore/playwright-setup' on GitHub by visiting: ...`). Open it, or use the yellow **Compare & pull request** banner on the repo page.
-2. Base: `main`, compare: `chore/playwright-setup`. Add the title and description, click **Create pull request**.
-3. Open the **Actions** tab (or the checks at the bottom of the PR). The workflow `Playwright Tests` (`.github/workflows/playwright.yml`) runs on Ubuntu: installs dependencies with `npm ci`, installs browsers with `npx playwright install --with-deps`, runs `npx playwright test`, and uploads the HTML report as an artefact.
-4. **Check:** the run is green (all 6 tests pass, including WebKit). Only then click **Merge pull request**.
-5. Locally, return to an up-to-date main:
-
-```powershell
-git switch main
-git pull
-```
+**Check:** the PR's check `Playwright Tests / test (pull_request)` is green. The workflow (`.github/workflows/playwright.yml`) runs on Ubuntu: `npm ci`, `npx playwright install --with-deps`, `npx playwright test` (all 3 browsers), then uploads the HTML report as an artefact. Verified 2026-11-09: green in 52s, WebKit included.
 
 ---
 
@@ -385,6 +344,101 @@ git pull
 
 `npx` runs the `playwright` command from this project's `node_modules`, so everyone uses the version in `package.json`.
 
+## Git workflow (every change)
+
+**Where:** VS Code terminal, in the repo root. Used for every piece of work from Day 1 onwards. Lessons refer to this section instead of repeating it.
+
+**The rule:** nothing is committed straight to `main`. Every change goes on a branch, through a pull request (PR), and is merged only when GitHub Actions is green. Docs changes go in the same commit as the code they describe.
+
+### 1. Start from an up-to-date main and create a branch
+
+```powershell
+git status
+git switch main
+git pull
+git switch -c TYPE/short-description
+```
+
+- `git status` first: **Check** it says `nothing to commit, working tree clean`. Uncommitted changes would be carried onto the new branch and mixed into unrelated work. If there are leftovers, commit them on their own branch first, or ask before discarding them.
+- `git switch main` moves to the main branch.
+- `git pull` downloads new commits from GitHub and updates your main, so the branch starts from the latest code.
+- `git switch -c NAME` creates a new branch from where you are and moves onto it (`-c` = create). Uncommitted files come with you.
+- Branch names: `TYPE/short-description`, lower case with hyphens. `chore/` setup and tooling, `feat/` new tests or features, `fix/` fixes, `docs/` docs only. Example: `feat/sign-in-tests`.
+- **Check:** `git status` shows `On branch TYPE/short-description`.
+
+### 2. Stage, check and commit
+
+```powershell
+git add .
+git status
+git commit -m "type: what changed"
+```
+
+- `git add .` stages (marks for the next commit) every new and changed file under the current folder, except what `.gitignore` excludes.
+- `git status` shows what will be committed. **Check** that `node_modules/`, `test-results/` and `playwright-report/` are not listed.
+- `git commit -m "..."` saves the staged files as one commit. Message format: `type: what changed`, imperative, same types as branch names. Example: `feat: add sign-in tests for valid and wrong password`.
+
+### 3. Push
+
+```powershell
+git push -u origin TYPE/short-description
+```
+
+- Uploads the branch to GitHub (`origin` = the GitHub copy of the repo).
+- `-u` (upstream) links your local branch to the GitHub one, so later pushes on this branch are just `git push`.
+- The first push on a machine may open a browser window to sign in to GitHub.
+- The output prints a link to create a pull request.
+
+### 4. Open a pull request (browser)
+
+1. Open the link from the push output, or the **Compare & pull request** banner on the repo page.
+2. Base: `main`. Compare: your branch.
+3. Title: same style as the commit message. Description: what changed, why, and how it was tested (with real results).
+4. Click **Create pull request**. GitHub Actions starts automatically.
+
+More commits on the same branch (fixes, review changes): repeat step 2, then `git push`. The PR updates and CI runs again.
+
+### 5. Merge when green (browser)
+
+1. **Check:** all checks at the bottom of the PR are green. Never merge on red or while checks are running.
+2. Merge button arrow: choose **Squash and merge**, then **Confirm squash and merge**.
+3. Click **Delete branch**.
+
+Merge options on GitHub, and why this repo uses squash:
+
+| Option | What it does | Result on main |
+|---|---|---|
+| **Squash and merge** (used here) | Combines all the PR's commits into one new commit, with the PR title as its message. | One commit per PR; history reads like a changelog. |
+| Create a merge commit | Keeps every branch commit and adds a "Merge pull request #N" commit. | Full detail, but noisy ("fix typo", "try again") plus extra merge commits. |
+| Rebase and merge | Replays each branch commit onto main, no merge commit. | Linear, but every small commit lands on main. |
+
+Workplace note: many teams use merge commits or rebase; what matters is that one option is used consistently (often enforced in the repo settings). The reasoning for this repo is in the decision records.
+
+### 6. Clean up locally
+
+```powershell
+git switch main
+git pull
+git branch -D TYPE/short-description
+git fetch --prune
+git log --oneline
+```
+
+- `git switch main` then `git pull`: back on main, with the merged commit downloaded.
+- `git branch -D NAME` deletes the local branch. Capital `-D` is needed after a squash merge: the squash made a new commit on main, so Git can't see the branch's own commits were merged and lowercase `-d` refuses with "not fully merged". The work is safe in main.
+- `git fetch --prune` downloads updates and removes stale **remote-tracking branches**. Git keeps three copies of a branch name: the local branch, the branch on GitHub, and `origin/NAME`, a local bookmark of where the GitHub branch was at the last fetch or pull. Deleting a branch on GitHub leaves the bookmark behind until it is pruned.
+- `git log --oneline` shows the history, one commit per line, newest first. **Check:** the squashed commit is at the top.
+
+### Everyday status commands
+
+| Command | What it does |
+|---|---|
+| `git status` | Current branch, and which files are changed, staged or untracked. |
+| `git log --oneline` | History, one line per commit. |
+| `git branch -a` | All branches: local, and remote-tracking (`remotes/origin/...`). |
+| `git diff` | Exact line changes not yet staged. `git diff --staged` for staged ones. |
+| `git restore FILE` | Throws away uncommitted changes to FILE (cannot be undone). |
+
 ## Troubleshooting
 
 | Problem | Cause | Fix |
@@ -396,3 +450,4 @@ git pull
 | `ERROR Cannot copy server address to clipboard` when running `npx serve webapp` | `serve` tries to copy the URL to the clipboard and fails in the VS Code terminal | Harmless: the server is running. To silence it: `npx serve webapp --no-clipboard`. |
 | `Playwright Host validation warning: Host system is missing dependencies! ... libwebp.dll` at the end of `npm init playwright@latest` | Windows is missing a library one of the downloaded browsers expects. The install still finishes with `Success!`. | Only WebKit is affected: its tests fail with `browserType.launch: Host system is missing dependencies! libwebp.dll`. Chromium and Firefox pass. No official Windows fix found (2026-11-09). Workaround: run locally with `--project=chromium --project=firefox`; CI runs on Ubuntu, where `npx playwright install --with-deps` installs WebKit's libraries. From Week 1 Day 2 the config is Chromium only. |
 | Windows Firewall popup on first `npx serve` | Node is opening a network port | Allow **Private networks** only. |
+| `warning: in the working copy of '...', LF will be replaced by CRLF the next time Git touches it` on `git add` | Git for Windows converts line endings: files use LF (Unix style) in the repo and CRLF (Windows style) on disk (`core.autocrlf=true`). | Harmless; the repo still stores LF. To be made consistent on Week 1 Day 2 with a `.gitattributes` file (`* text=auto eol=lf`), alongside Prettier. |
