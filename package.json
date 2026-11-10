@@ -13,7 +13,14 @@
     "url": "https://github.com/alan-Khadir/playwright-typescript-playground/issues"
   },
   "homepage": "https://github.com/alan-Khadir/playwright-typescript-playground#readme",
-  "scripts": {},
+  "scripts": {
+    "test": "playwright test --pass-with-no-tests",
+    "test:ui": "playwright test --ui",
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.65.0",
