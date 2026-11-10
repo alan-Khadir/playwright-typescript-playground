@@ -3,11 +3,17 @@ import eslint from '@eslint/js';
 import { defineConfig } from 'eslint/config';
 import tseslint from 'typescript-eslint';
 import playwright from 'eslint-plugin-playwright';
+import eslintConfigPrettier from 'eslint-config-prettier/flat';
 
 export default defineConfig(
   /* Folders ESLint never checks: installed packages, generated reports, and the app under test. */
   {
-    ignores: ['node_modules/', 'playwright-report/', 'test-results/', 'webapp/'],
+    ignores: [
+      'node_modules/',
+      'playwright-report/',
+      'test-results/',
+      'webapp/',
+    ],
   },
 
   /* Basic JavaScript rules, e.g. unused variables. */
@@ -35,4 +41,7 @@ export default defineConfig(
     files: ['tests/**/*.ts'],
     extends: [playwright.configs['flat/recommended']],
   },
+
+  /* Last: switch off every ESLint rule about formatting, because Prettier owns formatting. */
+  eslintConfigPrettier,
 );

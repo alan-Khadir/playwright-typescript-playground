@@ -16,35 +16,35 @@ This is the single record of how this framework is set up. It is written so that
 
 Copied from the plan. npm packages are added in the week they are first used, not earlier.
 
-| Purpose | Tool | What it is for | Status |
-|---|---|---|---|
-| Core | Node.js LTS (22+) | Runs JavaScript and TypeScript outside the browser. Playwright is a Node library, so the tests run on Node. | installed (Step 1) |
-| Core | npm | Node's package manager: installs libraries listed in package.json and runs npm scripts. Comes with Node. | installed (Step 1) |
-| Core | Git | Version control: history of every change, branches, and clone/push to GitHub. | installed (Step 1) |
-| Core | @playwright/test | Playwright's test runner and browser automation library: `test`, `expect`, locators, fixtures, reports. Dev dependency. | installed Week 1 Day 1 (Step 7) |
-| Core | TypeScript | JavaScript with types, so mistakes are caught in the editor before a test runs. Playwright runs .ts files directly without it; the `typescript` package is only needed for `tsc --noEmit`. | Playwright handles .ts from Day 1; `typescript` package added in Week 1 Day 2 |
-| Core | @types/node | Type definitions for Node's built-in modules (e.g. `process.env`), so TypeScript understands them. Dev dependency. | installed Week 1 Day 1 (Step 7) |
-| Serving the app | serve | Small static web server that serves `webapp/` at http://localhost:3000. Dev dependency so CI runs the same version. | npx on Day 1; dev dependency Week 1 Day 2 |
-| Editor | VS Code | Code editor; `code` is its command-line launcher. | installed (Step 1) |
-| Editor | Playwright Test for VS Code | Run and debug tests from the editor; Pick locator. | installed (Step 2) |
-| Editor | ESLint extension | Shows lint problems as you type. | installed (Step 2) |
-| Editor | Prettier extension | Formats code automatically on save. | installed (Step 2) |
-| Editor | Cucumber (official) extension | Syntax highlighting and step navigation for .feature files. | installed (Step 2); used Week 6 |
-| Finding locators | Pick locator (VS Code, UI mode, Inspector); codegen; Chrome DevTools accessibility tree | Find the user-facing locator for an element. Codegen is for exploring only, never pasted into the repo. | Week 1 |
-| Debugging | UI mode, trace viewer, Inspector, page.pause(), VS Code breakpoints | Step through tests and see exactly what happened when one fails. | Weeks 1-2 |
-| Code quality | eslint, @eslint/js, typescript-eslint, eslint-plugin-playwright | Lint rules for JavaScript, TypeScript and Playwright mistakes (e.g. a missing `await`). | added in Week 1 Day 2 |
-| Code quality | prettier, eslint-config-prettier | One code format for everyone; stops ESLint and Prettier fighting over formatting. | added in Week 1 Day 2 |
-| Code quality | tsc --noEmit | Type-checks the whole project without producing output files. | Week 1 Day 2 |
-| Reporting | Built-in HTML report with traces | Shows which tests passed or failed, with a trace to replay each failure. Uploaded as a CI artefact. | Week 1 |
-| CI | GitHub Actions | Runs the tests on GitHub's machines on every push and PR. | Week 1 (workflow); Week 9 (branch protection, status badge) |
-| Config | dotenv; .env (not committed) and .env.example | Loads settings such as URLs and credentials from a file instead of hard-coding them. | added in Week 2 |
-| Test data | @faker-js/faker | Generates realistic random test data (names, emails). | added in Week 3 |
-| BDD | playwright-bdd | Runs Gherkin .feature files on top of the same Playwright page objects and fixtures. | added in Week 6 |
-| API under test | express, tsx, @types/express | The Topics API server added in Week 7, and the tool to run it in TypeScript. | added in Week 7 |
-| Accessibility | @axe-core/playwright | Automated accessibility scans inside Playwright tests. | added in Week 10 |
-| Optional | Husky and lint-staged | Run lint on staged files before each commit. | Week 9 (optional) |
-| Optional | Allure | Alternative report; only if a target job asks for it. | - |
-| Not used | cucumber-js, ts-node, Jest, Mocha, Chai, axios, Docker, wait/retry libraries, locator extensions | Playwright already covers these jobs; adding them duplicates tooling. | - |
+| Purpose          | Tool                                                                                             | What it is for                                                                                                                                                                             | Status                                                                        |
+| ---------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| Core             | Node.js LTS (22+)                                                                                | Runs JavaScript and TypeScript outside the browser. Playwright is a Node library, so the tests run on Node.                                                                                | installed (Step 1)                                                            |
+| Core             | npm                                                                                              | Node's package manager: installs libraries listed in package.json and runs npm scripts. Comes with Node.                                                                                   | installed (Step 1)                                                            |
+| Core             | Git                                                                                              | Version control: history of every change, branches, and clone/push to GitHub.                                                                                                              | installed (Step 1)                                                            |
+| Core             | @playwright/test                                                                                 | Playwright's test runner and browser automation library: `test`, `expect`, locators, fixtures, reports. Dev dependency.                                                                    | installed Week 1 Day 1 (Step 7)                                               |
+| Core             | TypeScript                                                                                       | JavaScript with types, so mistakes are caught in the editor before a test runs. Playwright runs .ts files directly without it; the `typescript` package is only needed for `tsc --noEmit`. | Playwright handles .ts from Day 1; `typescript` package added in Week 1 Day 2 |
+| Core             | @types/node                                                                                      | Type definitions for Node's built-in modules (e.g. `process.env`), so TypeScript understands them. Dev dependency.                                                                         | installed Week 1 Day 1 (Step 7)                                               |
+| Serving the app  | serve                                                                                            | Small static web server that serves `webapp/` at http://localhost:3000. Dev dependency so CI runs the same version.                                                                        | npx on Day 1; dev dependency Week 1 Day 2                                     |
+| Editor           | VS Code                                                                                          | Code editor; `code` is its command-line launcher.                                                                                                                                          | installed (Step 1)                                                            |
+| Editor           | Playwright Test for VS Code                                                                      | Run and debug tests from the editor; Pick locator.                                                                                                                                         | installed (Step 2)                                                            |
+| Editor           | ESLint extension                                                                                 | Shows lint problems as you type.                                                                                                                                                           | installed (Step 2)                                                            |
+| Editor           | Prettier extension                                                                               | Formats code automatically on save.                                                                                                                                                        | installed (Step 2)                                                            |
+| Editor           | Cucumber (official) extension                                                                    | Syntax highlighting and step navigation for .feature files.                                                                                                                                | installed (Step 2); used Week 6                                               |
+| Finding locators | Pick locator (VS Code, UI mode, Inspector); codegen; Chrome DevTools accessibility tree          | Find the user-facing locator for an element. Codegen is for exploring only, never pasted into the repo.                                                                                    | Week 1                                                                        |
+| Debugging        | UI mode, trace viewer, Inspector, page.pause(), VS Code breakpoints                              | Step through tests and see exactly what happened when one fails.                                                                                                                           | Weeks 1-2                                                                     |
+| Code quality     | eslint, @eslint/js, typescript-eslint, eslint-plugin-playwright                                  | Lint rules for JavaScript, TypeScript and Playwright mistakes (e.g. a missing `await`).                                                                                                    | added in Week 1 Day 2                                                         |
+| Code quality     | prettier, eslint-config-prettier                                                                 | One code format for everyone; stops ESLint and Prettier fighting over formatting.                                                                                                          | added in Week 1 Day 2                                                         |
+| Code quality     | tsc --noEmit                                                                                     | Type-checks the whole project without producing output files.                                                                                                                              | Week 1 Day 2                                                                  |
+| Reporting        | Built-in HTML report with traces                                                                 | Shows which tests passed or failed, with a trace to replay each failure. Uploaded as a CI artefact.                                                                                        | Week 1                                                                        |
+| CI               | GitHub Actions                                                                                   | Runs the tests on GitHub's machines on every push and PR.                                                                                                                                  | Week 1 (workflow); Week 9 (branch protection, status badge)                   |
+| Config           | dotenv; .env (not committed) and .env.example                                                    | Loads settings such as URLs and credentials from a file instead of hard-coding them.                                                                                                       | added in Week 2                                                               |
+| Test data        | @faker-js/faker                                                                                  | Generates realistic random test data (names, emails).                                                                                                                                      | added in Week 3                                                               |
+| BDD              | playwright-bdd                                                                                   | Runs Gherkin .feature files on top of the same Playwright page objects and fixtures.                                                                                                       | added in Week 6                                                               |
+| API under test   | express, tsx, @types/express                                                                     | The Topics API server added in Week 7, and the tool to run it in TypeScript.                                                                                                               | added in Week 7                                                               |
+| Accessibility    | @axe-core/playwright                                                                             | Automated accessibility scans inside Playwright tests.                                                                                                                                     | added in Week 10                                                              |
+| Optional         | Husky and lint-staged                                                                            | Run lint on staged files before each commit.                                                                                                                                               | Week 9 (optional)                                                             |
+| Optional         | Allure                                                                                           | Alternative report; only if a target job asks for it.                                                                                                                                      | -                                                                             |
+| Not used         | cucumber-js, ts-node, Jest, Mocha, Chai, axios, Docker, wait/retry libraries, locator extensions | Playwright already covers these jobs; adding them duplicates tooling.                                                                                                                      | -                                                                             |
 
 ---
 
@@ -73,24 +73,24 @@ What each one checks and why it is needed:
 
 **Check:**
 
-| Command | You need | Verified on 2026-11-09 |
-|---|---|---|
-| `node --version` | v22 or higher | v24.16.0 |
-| `npm --version` | any number (comes with Node) | 11.13.0 |
-| `git --version` | any recent version | 2.54.0.windows.1 |
-| `code --version` | any recent version | 1.138.0 |
-| `git config --global user.name` | your GitHub username | set |
-| `git config --global user.email` | an email (GitHub noreply recommended) | set |
+| Command                          | You need                              | Verified on 2026-11-09 |
+| -------------------------------- | ------------------------------------- | ---------------------- |
+| `node --version`                 | v22 or higher                         | v24.16.0               |
+| `npm --version`                  | any number (comes with Node)          | 11.13.0                |
+| `git --version`                  | any recent version                    | 2.54.0.windows.1       |
+| `code --version`                 | any recent version                    | 1.138.0                |
+| `git config --global user.name`  | your GitHub username                  | set                    |
+| `git config --global user.email` | an email (GitHub noreply recommended) | set                    |
 
 ### 1a. If something is missing
 
 Install only what is missing or too old. `winget` (Windows Package Manager) is built into Windows 10/11. **After any install, close PowerShell and open a new window**, so it picks up the new commands, then re-run the check.
 
-| Missing | Install with winget (PowerShell window) | Or download manually |
-|---|---|---|
-| Node.js (or older than 22) | `winget install OpenJS.NodeJS.LTS` | https://nodejs.org: the **LTS** Windows installer (.msi), default options. npm comes with it. |
-| Git | `winget install Git.Git` | https://git-scm.com/downloads/win, default options. |
-| VS Code | `winget install Microsoft.VisualStudioCode` | https://code.visualstudio.com. In the installer keep **"Add to PATH"** ticked, so the `code` command works. |
+| Missing                    | Install with winget (PowerShell window)     | Or download manually                                                                                        |
+| -------------------------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Node.js (or older than 22) | `winget install OpenJS.NodeJS.LTS`          | https://nodejs.org: the **LTS** Windows installer (.msi), default options. npm comes with it.               |
+| Git                        | `winget install Git.Git`                    | https://git-scm.com/downloads/win, default options.                                                         |
+| VS Code                    | `winget install Microsoft.VisualStudioCode` | https://code.visualstudio.com. In the installer keep **"Add to PATH"** ticked, so the `code` command works. |
 
 **Git name and email not set:** run these (PowerShell window), using your own details:
 
@@ -115,12 +115,12 @@ code --install-extension CucumberOpen.cucumber-official
 code --list-extensions
 ```
 
-| Extension ID | What it is |
-|---|---|
-| `ms-playwright.playwright` | Playwright Test for VS Code (Microsoft): run, debug and pick locators from the editor. `--force` updates it if an older version is already installed. |
-| `dbaeumer.vscode-eslint` | ESLint (Microsoft): lint errors shown as you type. |
-| `esbenp.prettier-vscode` | Prettier: automatic code formatting. |
-| `CucumberOpen.cucumber-official` | Cucumber (official): optional, used from Week 6. |
+| Extension ID                     | What it is                                                                                                                                            |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ms-playwright.playwright`       | Playwright Test for VS Code (Microsoft): run, debug and pick locators from the editor. `--force` updates it if an older version is already installed. |
+| `dbaeumer.vscode-eslint`         | ESLint (Microsoft): lint errors shown as you type.                                                                                                    |
+| `esbenp.prettier-vscode`         | Prettier: automatic code formatting.                                                                                                                  |
+| `CucumberOpen.cucumber-official` | Cucumber (official): optional, used from Week 6.                                                                                                      |
 
 Installing by ID (publisher.name) guarantees the official extension, not a lookalike.
 
@@ -132,15 +132,16 @@ Recommended while learning: disable AI coding assistants for this workspace (Ext
 
 **Where:** browser, https://github.com/new (signed in to GitHub).
 
-| Field | Value |
-|---|---|
-| Repository name | `playwright-typescript-playground` |
-| Visibility | Public |
-| Add a README | On (creates the first commit and the `main` branch, so the repo can be cloned straight away) |
-| .gitignore | Node |
-| Licence | MIT |
+| Field           | Value                                                                                        |
+| --------------- | -------------------------------------------------------------------------------------------- |
+| Repository name | `playwright-typescript-playground`                                                           |
+| Visibility      | Public                                                                                       |
+| Add a README    | On (creates the first commit and the `main` branch, so the repo can be cloned straight away) |
+| .gitignore      | Node                                                                                         |
+| Licence         | MIT                                                                                          |
 
 Click **Create repository**. Then on the repo page click the gear icon next to **About** and set:
+
 - Description: `Playwright + TypeScript test automation framework for a static web app: page objects, fixtures, CI on GitHub Actions.`
 - Topics: `playwright`, `typescript`, `test-automation`
 
@@ -164,6 +165,7 @@ Get-ChildItem -Force
 - `git clone` downloads the repo and its history, and sets up the link back to GitHub (the remote `origin`).
 
 **Check:**
+
 - `git status`: `On branch main`, `Your branch is up to date with 'origin/main'`, `nothing to commit, working tree clean`.
 - `git log --oneline`: one line, `Initial commit`.
 - `Get-ChildItem -Force`: `.git`, `.gitignore`, `LICENSE`, `README.md`.
@@ -195,6 +197,7 @@ Get-Content .\webapp\serve.json
 About the app: static HTML/JS, no backend, state kept in the browser's localStorage, topic data loaded from `data/topics.json`. One fixed user: `user@test.com` / `Password123`.
 
 `webapp/serve.json` configures the `serve` web server:
+
 - `"cleanUrls": false` keeps `.html` in URLs (sign-in is `/html/signin.html`). URL assertions depend on this.
 - `redirects` send `/` and `/html` to `/html/index.html` (302, temporary).
 
@@ -225,6 +228,7 @@ npx serve webapp
 - The terminal stays busy while the server runs. **Ctrl+C** stops it (answer `Y` if asked "Terminate batch job?").
 
 **Check:**
+
 - The terminal shows a **Serving!** box with `Local: http://localhost:3000`.
 - In the browser, http://localhost:3000 opens the home page at `/html/index.html`.
 - Sign in with `user@test.com` / `Password123`: you land on `/html/dashboard.html` ("Choose a Topic", 4 topic cards per page, 3 pages).
@@ -247,13 +251,13 @@ What it does: downloads and runs Playwright's setup wizard (`create-playwright`)
 
 Answer the prompts (arrow keys and Enter):
 
-| Prompt | Answer |
-|---|---|
-| Need to install create-playwright... Ok to proceed? | `y` |
-| Do you want to use TypeScript or JavaScript? | TypeScript |
-| Where to put your end-to-end tests? | `tests` (default) |
-| Add a GitHub Actions workflow? | Yes |
-| Install Playwright browsers? | Yes |
+| Prompt                                              | Answer            |
+| --------------------------------------------------- | ----------------- |
+| Need to install create-playwright... Ok to proceed? | `y`               |
+| Do you want to use TypeScript or JavaScript?        | TypeScript        |
+| Where to put your end-to-end tests?                 | `tests` (default) |
+| Add a GitHub Actions workflow?                      | Yes               |
+| Install Playwright browsers?                        | Yes               |
 
 What the output shows, in order (verified 2026-11-09):
 
@@ -264,19 +268,20 @@ What the output shows, in order (verified 2026-11-09):
 5. `✔ Success! Created a Playwright Test project`.
 
 **Check:**
+
 - The output ends with `✔ Success!`.
 - `npx playwright --version` prints the installed Playwright version (verified: `Version 1.65.0`).
 - `git status` shows `modified: .gitignore` and untracked `.github/`, `package-lock.json`, `package.json`, `playwright.config.ts`, `tests/`, `webapp/`. `node_modules/` must **not** appear (the Node .gitignore excludes it).
 
-| New or changed file | What it is |
-|---|---|
-| `package.json` | The project's manifest: name, scripts and the list of dependencies. |
-| `package-lock.json` | Records the exact version of every installed package, so every machine and CI installs the same set (`npm ci`). Always committed. |
-| `playwright.config.ts` | Playwright settings: test folder, browsers (projects), reporter, retries. Rewritten line by line on Week 1 Day 2. |
-| `tests/example.spec.ts` | Example test from the wizard. Deleted on Week 1 Day 2. |
-| `.github/workflows/playwright.yml` | GitHub Actions workflow: runs the tests on every push and PR to main. |
-| `.gitignore` (modified) | The wizard appended Playwright's output folders (test results, report, cache) so they are never committed. |
-| `node_modules/` (not committed) | The installed packages themselves. Rebuilt from package-lock.json with `npm ci`. |
+| New or changed file                | What it is                                                                                                                        |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `package.json`                     | The project's manifest: name, scripts and the list of dependencies.                                                               |
+| `package-lock.json`                | Records the exact version of every installed package, so every machine and CI installs the same set (`npm ci`). Always committed. |
+| `playwright.config.ts`             | Playwright settings: test folder, browsers (projects), reporter, retries. Rewritten line by line on Week 1 Day 2.                 |
+| `tests/example.spec.ts`            | Example test from the wizard. Deleted on Week 1 Day 2.                                                                            |
+| `.github/workflows/playwright.yml` | GitHub Actions workflow: runs the tests on every push and PR to main.                                                             |
+| `.gitignore` (modified)            | The wizard appended Playwright's output folders (test results, report, cache) so they are never committed.                        |
+| `node_modules/` (not committed)    | The installed packages themselves. Rebuilt from package-lock.json with `npm ci`.                                                  |
 
 Known follow-ups (Week 1 Day 2, when package.json is reviewed line by line): `"license"` says `ISC` but the repo licence is MIT; `"main": "index.js"` and the placeholder `"test"` script are npm defaults that don't apply to a test project.
 
@@ -331,16 +336,16 @@ code docs\setup-guide.md
 
 **Where:** VS Code terminal, in the repo root. From Week 1 Day 2 the common ones also get npm scripts (listed in the README).
 
-| Command | What it does | When to use it |
-|---|---|---|
-| `npx playwright test` | Runs every test, on every browser project in `playwright.config.ts`, headless (no visible window). | Normal full run, and what CI does. |
-| `npx playwright test --ui` | Opens UI mode: pick tests, watch them run step by step, time-travel through each action, Pick locator. | Writing and debugging tests day to day. |
-| `npx playwright test --project=chromium` | Runs only the `chromium` project (Desktop Chrome). | Faster local runs; isolating a browser-specific failure. |
-| `npx playwright test example` | Runs only test files whose path contains `example` (a filter, not an exact name). | Running one spec file. |
-| `npx playwright test --debug` | Opens a visible browser plus the Playwright Inspector, paused before the first action, to step through. | Investigating one failing test. |
-| `npx playwright show-report` | Opens the last HTML report in the browser. | After a run, to see results and traces. |
-| `npx playwright codegen` | Opens a browser and records your clicks as test code. | **Exploring only**: to see which locator Playwright suggests. Generated code is never pasted into the repo. |
-| `npx playwright --version` | Prints the installed Playwright version. | Checking the install; bug reports. |
+| Command                                  | What it does                                                                                            | When to use it                                                                                              |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `npx playwright test`                    | Runs every test, on every browser project in `playwright.config.ts`, headless (no visible window).      | Normal full run, and what CI does.                                                                          |
+| `npx playwright test --ui`               | Opens UI mode: pick tests, watch them run step by step, time-travel through each action, Pick locator.  | Writing and debugging tests day to day.                                                                     |
+| `npx playwright test --project=chromium` | Runs only the `chromium` project (Desktop Chrome).                                                      | Faster local runs; isolating a browser-specific failure.                                                    |
+| `npx playwright test example`            | Runs only test files whose path contains `example` (a filter, not an exact name).                       | Running one spec file.                                                                                      |
+| `npx playwright test --debug`            | Opens a visible browser plus the Playwright Inspector, paused before the first action, to step through. | Investigating one failing test.                                                                             |
+| `npx playwright show-report`             | Opens the last HTML report in the browser.                                                              | After a run, to see results and traces.                                                                     |
+| `npx playwright codegen`                 | Opens a browser and records your clicks as test code.                                                   | **Exploring only**: to see which locator Playwright suggests. Generated code is never pasted into the repo. |
+| `npx playwright --version`               | Prints the installed Playwright version.                                                                | Checking the install; bug reports.                                                                          |
 
 `npx` runs the `playwright` command from this project's `node_modules`, so everyone uses the version in `package.json`.
 
@@ -406,11 +411,11 @@ More commits on the same branch (fixes, review changes): repeat step 2, then `gi
 
 Merge options on GitHub, and why this repo uses squash:
 
-| Option | What it does | Result on main |
-|---|---|---|
-| **Squash and merge** (used here) | Combines all the PR's commits into one new commit, with the PR title as its message. | One commit per PR; history reads like a changelog. |
-| Create a merge commit | Keeps every branch commit and adds a "Merge pull request #N" commit. | Full detail, but noisy ("fix typo", "try again") plus extra merge commits. |
-| Rebase and merge | Replays each branch commit onto main, no merge commit. | Linear, but every small commit lands on main. |
+| Option                           | What it does                                                                         | Result on main                                                             |
+| -------------------------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- |
+| **Squash and merge** (used here) | Combines all the PR's commits into one new commit, with the PR title as its message. | One commit per PR; history reads like a changelog.                         |
+| Create a merge commit            | Keeps every branch commit and adds a "Merge pull request #N" commit.                 | Full detail, but noisy ("fix typo", "try again") plus extra merge commits. |
+| Rebase and merge                 | Replays each branch commit onto main, no merge commit.                               | Linear, but every small commit lands on main.                              |
 
 Workplace note: many teams use merge commits or rebase; what matters is that one option is used consistently (often enforced in the repo settings). The reasoning for this repo is in the decision records.
 
@@ -431,25 +436,25 @@ git log --oneline
 
 ### Everyday status commands
 
-| Command | What it does |
-|---|---|
-| `git status` | Current branch, and which files are changed, staged or untracked. |
-| `git log --oneline` | History, one line per commit. |
-| `git branch -a` | All branches: local, and remote-tracking (`remotes/origin/...`). |
-| `git diff` | Exact line changes not yet staged. `git diff --staged` for staged ones. |
-| `git diff --stat` | Summary only: each changed file and how many lines were added or removed. Quick sanity check before committing. |
-| `git restore FILE` | Throws away uncommitted changes to FILE (cannot be undone). |
+| Command             | What it does                                                                                                    |
+| ------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `git status`        | Current branch, and which files are changed, staged or untracked.                                               |
+| `git log --oneline` | History, one line per commit.                                                                                   |
+| `git branch -a`     | All branches: local, and remote-tracking (`remotes/origin/...`).                                                |
+| `git diff`          | Exact line changes not yet staged. `git diff --staged` for staged ones.                                         |
+| `git diff --stat`   | Summary only: each changed file and how many lines were added or removed. Quick sanity check before committing. |
+| `git restore FILE`  | Throws away uncommitted changes to FILE (cannot be undone).                                                     |
 
 ## Troubleshooting
 
-| Problem | Cause | Fix |
-|---|---|---|
-| `npm` or `npx` fails with "running scripts is disabled on this system" | PowerShell execution policy blocks `npm.ps1` | PowerShell window: `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned`, answer `Y`, then open a new window. |
-| `node`, `git` or `code` "is not recognized" right after installing | The open PowerShell window has the old PATH | Close PowerShell and open a new window. For `code`, reinstall VS Code with "Add to PATH" ticked. |
-| `DeprecationWarning: url.parse()` when running `code --install-extension` | Comes from VS Code's own command-line tool | Harmless. Ignore. |
-| Commands fail or create files in odd places | PowerShell opened in `C:\Windows\System32` | `cd C:\git-personal\playwright-typescript-playground` first, or use the VS Code terminal. |
-| `ERROR Cannot copy server address to clipboard` when running `npx serve webapp` | `serve` tries to copy the URL to the clipboard and fails in the VS Code terminal | Harmless: the server is running. To silence it: `npx serve webapp --no-clipboard`. |
-| `Playwright Host validation warning: Host system is missing dependencies! ... libwebp.dll` at the end of `npm init playwright@latest` | Windows is missing a library one of the downloaded browsers expects. The install still finishes with `Success!`. | Only WebKit is affected: its tests fail with `browserType.launch: Host system is missing dependencies! libwebp.dll`. Chromium and Firefox pass. No official Windows fix found (2026-11-09). Workaround: run locally with `--project=chromium --project=firefox`; CI runs on Ubuntu, where `npx playwright install --with-deps` installs WebKit's libraries. From Week 1 Day 2 the config is Chromium only. |
-| Windows Firewall popup on first `npx serve` | Node is opening a network port | Allow **Private networks** only. |
-| `warning: in the working copy of '...', LF will be replaced by CRLF the next time Git touches it` on `git add` | Git for Windows converts line endings: files use LF (Unix style) in the repo and CRLF (Windows style) on disk (`core.autocrlf=true`). | Harmless; the repo still stores LF. To be made consistent on Week 1 Day 2 with a `.gitattributes` file (`* text=auto eol=lf`), alongside Prettier. |
-| CI step "Install Playwright Browsers" runs for 10+ minutes (normally under a minute; whole job ~1 min) | The runner is stuck downloading a browser or Linux packages (`--with-deps` uses apt): a slow mirror or a network hang on GitHub's side, not your code. | Expand the step's log. If the last line hasn't changed for several minutes, click **Cancel workflow**, then **Re-run all jobs**. The workflow's `timeout-minutes: 60` would stop it eventually. Seen 2026-11-09: stuck in apt at `Get:109 ... libdecor-0-0` from azure.archive.ubuntu.com. If it keeps happening: cache browsers between runs, or run the job in the official Playwright Docker image (dependencies preinstalled). |
+| Problem                                                                                                                               | Cause                                                                                                                                                  | Fix                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm` or `npx` fails with "running scripts is disabled on this system"                                                                | PowerShell execution policy blocks `npm.ps1`                                                                                                           | PowerShell window: `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned`, answer `Y`, then open a new window.                                                                                                                                                                                                                                                                                                     |
+| `node`, `git` or `code` "is not recognized" right after installing                                                                    | The open PowerShell window has the old PATH                                                                                                            | Close PowerShell and open a new window. For `code`, reinstall VS Code with "Add to PATH" ticked.                                                                                                                                                                                                                                                                                                                                   |
+| `DeprecationWarning: url.parse()` when running `code --install-extension`                                                             | Comes from VS Code's own command-line tool                                                                                                             | Harmless. Ignore.                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Commands fail or create files in odd places                                                                                           | PowerShell opened in `C:\Windows\System32`                                                                                                             | `cd C:\git-personal\playwright-typescript-playground` first, or use the VS Code terminal.                                                                                                                                                                                                                                                                                                                                          |
+| `ERROR Cannot copy server address to clipboard` when running `npx serve webapp`                                                       | `serve` tries to copy the URL to the clipboard and fails in the VS Code terminal                                                                       | Harmless: the server is running. To silence it: `npx serve webapp --no-clipboard`.                                                                                                                                                                                                                                                                                                                                                 |
+| `Playwright Host validation warning: Host system is missing dependencies! ... libwebp.dll` at the end of `npm init playwright@latest` | Windows is missing a library one of the downloaded browsers expects. The install still finishes with `Success!`.                                       | Only WebKit is affected: its tests fail with `browserType.launch: Host system is missing dependencies! libwebp.dll`. Chromium and Firefox pass. No official Windows fix found (2026-11-09). Workaround: run locally with `--project=chromium --project=firefox`; CI runs on Ubuntu, where `npx playwright install --with-deps` installs WebKit's libraries. From Week 1 Day 2 the config is Chromium only.                         |
+| Windows Firewall popup on first `npx serve`                                                                                           | Node is opening a network port                                                                                                                         | Allow **Private networks** only.                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `warning: in the working copy of '...', LF will be replaced by CRLF the next time Git touches it` on `git add`                        | Git for Windows converts line endings: files use LF (Unix style) in the repo and CRLF (Windows style) on disk (`core.autocrlf=true`).                  | Harmless; the repo still stores LF. To be made consistent on Week 1 Day 2 with a `.gitattributes` file (`* text=auto eol=lf`), alongside Prettier.                                                                                                                                                                                                                                                                                 |
+| CI step "Install Playwright Browsers" runs for 10+ minutes (normally under a minute; whole job ~1 min)                                | The runner is stuck downloading a browser or Linux packages (`--with-deps` uses apt): a slow mirror or a network hang on GitHub's side, not your code. | Expand the step's log. If the last line hasn't changed for several minutes, click **Cancel workflow**, then **Re-run all jobs**. The workflow's `timeout-minutes: 60` would stop it eventually. Seen 2026-11-09: stuck in apt at `Get:109 ... libdecor-0-0` from azure.archive.ubuntu.com. If it keeps happening: cache browsers between runs, or run the job in the official Playwright Docker image (dependencies preinstalled). |

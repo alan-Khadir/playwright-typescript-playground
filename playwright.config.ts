@@ -83,7 +83,8 @@ export default defineConfig({
     /* Our app is static files served by serve (dev dependency), not `npm run start`.
        --listen 3000: the port. --no-port-switching: fail if 3000 is busy instead of
        quietly using another port. --no-clipboard: avoids serve's clipboard error. */
-    command: 'npx serve webapp --listen 3000 --no-port-switching --no-clipboard',
+    command:
+      'npx serve webapp --listen 3000 --no-port-switching --no-clipboard',
     /* Wait until the app answers here before running tests. */
     url: 'http://localhost:3000',
     /* Locally, reuse a server already running; on CI always start a fresh one. */
