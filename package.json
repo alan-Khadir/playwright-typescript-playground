@@ -15,9 +15,13 @@
   "homepage": "https://github.com/alan-Khadir/playwright-typescript-playground#readme",
   "scripts": {},
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.65.0",
     "@types/node": "^26.6.6",
+    "eslint": "^10.14.0",
+    "eslint-plugin-playwright": "^2.12.2",
     "serve": "^14.2.7",
-    "typescript": "~6.0"
+    "typescript": "~6.0",
+    "typescript-eslint": "^8.72.2"
   }
 }
