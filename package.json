@@ -1,21 +1,19 @@
 {
   "name": "playwright-typescript-playground",
   "version": "1.0.0",
+  "private": true,
   "description": "Playwright + TypeScript test automation framework for a static web app: page objects, fixtures, CI on GitHub Actions.",
-  "main": "index.js",
-  "scripts": {},
+  "license": "MIT",
+  "type": "commonjs",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/alan-Khadir/playwright-typescript-playground.git"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
   "bugs": {
     "url": "https://github.com/alan-Khadir/playwright-typescript-playground/issues"
   },
   "homepage": "https://github.com/alan-Khadir/playwright-typescript-playground#readme",
+  "scripts": {},
   "devDependencies": {
     "@playwright/test": "^1.65.0",
     "@types/node": "^26.6.6"
