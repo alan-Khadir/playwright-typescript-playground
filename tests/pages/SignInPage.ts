@@ -1,8 +1,13 @@
 // Page object for the Sign In screen (/html/signin.html).
-// A page object keeps one screen's locators and actions in one place,
-// so tests read like user steps and a UI change is fixed here only.
+// A page object keeps one screen's locators and actions in one place, so:
+//   - tests read like user steps: await signInPage.signIn('user@test.com', 'Password123');
+//   - when the screen changes, you fix ONE line here, not every test. Example: if the
+//     developers rename the button from "Sign In" to "Log in", only this line changes:
+//       this.signInButton = page.getByRole('button', { name: 'Log in' });
+//     Every test that calls signIn() keeps working without being touched.
 // Rule: page objects DO things; they never check things (no expect here).
-// Full explanations: week-01/concepts.md (Classes, Types, Promises).
+// Docs: https://playwright.dev/docs/pom
+//       https://www.typescriptlang.org/docs/handbook/2/classes.html
 
 // WHAT IS A TYPE?
 // A type is a label that says what kind of value something must hold.
@@ -15,7 +20,10 @@
 // In this file, Page and Locator only ever appear AFTER A COLON, as labels:
 //   readonly emailInput: Locator;   -> "the emailInput property must hold a Locator"
 //   constructor(... page: Page)     -> "this input must be a browser tab"
-// We never RUN them. tsc just uses them to catch mistakes. Example of a MISTAKE:
+// The WORDS Page and Locator are only labels: when the test runs, TypeScript deletes
+// them first, so they never run. (The real page and locators they describe DO run:
+// this.page.goto(...), this.emailInput.fill(...).) Before that, `npm run typecheck`
+// and VS Code (red underline) read the labels to catch mistakes. Example of a MISTAKE:
 //   this.emailInput = 'hello';
 // emailInput is labelled Locator, but 'hello' is text (a string), not a Locator.
 // `npm run typecheck` stops it with:
@@ -37,7 +45,8 @@ export class SignInPage {
   // emailInput, passwordInput and signInButton. Each property holds a Locator.
   // A spec reads them with a dot, e.g. signInPage.signInButton
   // `readonly` = filled once in the constructor below, then never overwritten. e.g.
-  //   signInPage.emailInput = page.getByLabel('Name');  -> tsc error: it's readonly
+  //   signInPage.emailInput = page.getByLabel('Name');
+  //   -> `npm run typecheck` reports: Cannot assign to 'emailInput' because it is a read-only property.
   readonly emailInput: Locator;
   readonly passwordInput: Locator;
   readonly signInButton: Locator;
@@ -50,7 +59,8 @@ export class SignInPage {
   //   - accept a browser tab as input,
   //   - store it as a property called this.page, so the methods below can use it,
   //   - `private`: only code inside this class can use it. A spec can't write
-  //       signInPage.page.goto('/')   -> tsc error: 'page' is private
+  //       signInPage.page.goto('/')
+  //       -> `npm run typecheck` reports: Property 'page' is private and only accessible within class 'SignInPage'.
   //     so specs go through our methods (goto, signIn) instead,
   //   - `readonly`: it can't be overwritten with another tab later.
   constructor(private readonly page: Page) {
@@ -93,15 +103,24 @@ export class SignInPage {
   async goto(): Promise<void> {
     // Open the sign-in page. '/html/signin.html' is added to baseURL from
     // playwright.config.ts, so the browser opens http://localhost:3000/html/signin.html
-    // Without `await`, the method would finish before the page loads, and the next step
-    // could run on a half-loaded page (passes sometimes, fails sometimes = flaky).
+    // What `await` waits for here: page.goto() finishes when the browser fires its
+    // "load" event (the HTML, scripts and images have loaded). That's Playwright's
+    // default, waitUntil: 'load'. Docs: https://playwright.dev/docs/api/class-page#page-goto
+    // It does NOT check that every element is ready (content the page's JavaScript adds
+    // later). That's covered by fill()/click() auto-waiting and by expect() in the spec.
+    // Without `await`, goto() would return straight away while the page is still
+    // loading, and the next step (fill) would race the page load = flaky.
     await this.page.goto('/html/signin.html');
   }
 
   // Sign in like a user: type email, type password, click Sign In.
-  // `(email: string, password: string)` = the method needs two pieces of text. e.g.
-  //   await signInPage.signIn('user@test.com', 'Password123');   -> OK
-  //   await signInPage.signIn(123, 'Password123');               -> tsc error: 123 is not text
+  // `(email: string, password: string)` = the method needs two pieces of text (strings).
+  // In code, text goes in quotes: 'user@test.com'. A number has no quotes: 123.
+  //   await signInPage.signIn('user@test.com', 'Password123');   -> OK: two strings
+  // Example of a MISTAKE a test could make, passing a number as the email:
+  //   await signInPage.signIn(123, 'Password123');
+  // `npm run typecheck` stops it before the test runs:
+  //   Argument of type 'number' is not assignable to parameter of type 'string'.
   // The values come in from the test (not written in here), so the wrong-password
   // test can reuse this method: signIn('user@test.com', 'WrongPassword')
   async signIn(email: string, password: string): Promise<void> {

@@ -28,15 +28,15 @@ npm test               # 4. the tests: slowest, so last
 
 Checks that stop bad code reaching `main`. Each one catches a different kind of problem, so they don't overlap.
 
-| Guardrail                         | What it catches                                         | How it runs                      | In CI             |
-| --------------------------------- | ------------------------------------------------------- | -------------------------------- | ----------------- |
-| TypeScript, strict (`tsc`)        | Wrong types                                             | `npm run typecheck`              | From Week 1 Day 4 |
-| ESLint (typescript-eslint)        | Risky code that is still valid: bad habits, likely bugs | `npm run lint`                   | From Week 1 Day 4 |
-| ESLint (eslint-plugin-playwright) | Playwright misuse in tests                              | `npm run lint`                   | From Week 1 Day 4 |
-| Prettier                          | Layout only: spaces, quotes, line breaks                | `npm run format:check`           | From Week 1 Day 4 |
-| `.gitattributes`                  | Windows (CRLF) vs Linux (LF) line endings               | Automatic on `git add`           | Always            |
-| Pinned versions + lock file       | "Works on my machine" from different tool versions      | `npm ci` installs exact versions | Always            |
-| Pull request + green Actions      | Untested code merged into `main`                        | GitHub                           | Always            |
+| Guardrail                         | What it catches                                         | How it runs                      |
+| --------------------------------- | ------------------------------------------------------- | -------------------------------- |
+| TypeScript, strict (`tsc`)        | Wrong types                                             | `npm run typecheck`              |
+| ESLint (typescript-eslint)        | Risky code that is still valid: bad habits, likely bugs | `npm run lint`                   |
+| ESLint (eslint-plugin-playwright) | Playwright misuse in tests                              | `npm run lint`                   |
+| Prettier                          | Layout only: spaces, quotes, line breaks                | `npm run format:check`           |
+| `.gitattributes`                  | Windows (CRLF) vs Linux (LF) line endings               | Automatic on `git add`           |
+| Pinned versions + lock file       | "Works on my machine" from different tool versions      | `npm ci` installs exact versions |
+| Pull request + green Actions      | Untested code merged into `main`                        | GitHub                           |
 
 ### TypeScript, strict
 

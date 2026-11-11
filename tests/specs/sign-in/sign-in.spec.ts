@@ -1,7 +1,8 @@
 // Tests for the Sign In screen.
 // Rule: the spec says WHAT is tested and holds every expect (every check).
 // The page object (SignInPage) only DOES things: find elements, fill, click.
-// Full explanations: week-01/concepts.md (Playwright test basics, Assertions).
+// Docs: https://playwright.dev/docs/writing-tests
+//       https://playwright.dev/docs/test-assertions
 
 // `test` and `expect` are FUNCTIONS from Playwright. A function is a set of steps you can run,
 // like a method but not inside a class. We RUN them, so they need a normal `import`:
@@ -38,8 +39,11 @@ test.describe('Sign in', () => {
   //     This is a FIXTURE: something Playwright creates before the test and
   //     throws away after it. It's why each test can run alone, in any order.
   test('valid user reaches the dashboard', async ({ page }) => {
-    // `const` = give a value a name that can't be pointed at a different value later:
-    //   signInPage = new SignInPage(page);   (a second time) -> tsc error: it's a const
+    // `const` = give a value a name, and that name can never be given a new value.
+    // Example of a MISTAKE `npm run typecheck` would catch, if a later line in this test did:
+    //   const signInPage = new SignInPage(page);   // first line: OK
+    //   signInPage = new SignInPage(page);         // later line: give it a new value
+    // `npm run typecheck` reports: Cannot assign to 'signInPage' because it is a constant.
     // `new SignInPage(page)` = build this test's own SignInPage object, using this test's
     // tab. This runs the constructor in SignInPage.ts, which sets the three locators.
     const signInPage = new SignInPage(page);
