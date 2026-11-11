@@ -1,14 +1,30 @@
+// TypeScript settings. `npm run typecheck` (tsc --noEmit) uses this file to check types.
+// tsc catches WRONG TYPES before a test runs.
+// Example: const timeout: number = '5000';  -> error: Type 'string' is not assignable to type 'number'.
+//          Fix: const timeout: number = 5000;
 {
   "compilerOptions": {
+    // Which JavaScript version to check against. ES2023 matches Node 24.
     "target": "ES2023",
+    // How import/export work: follow Node's own rules.
     "module": "nodenext",
     "moduleResolution": "nodenext",
+    // Load Node's built-in types (e.g. process.env.CI). Nothing else is loaded automatically.
     "types": ["node"],
+    // Turn on all strict checks: no hidden `any`, no using a value that might be null/undefined.
+    // Example: function signIn(email) {}  -> error: 'email' implicitly has an 'any' type.
+    //          Fix: function signIn(email: string) {}
     "strict": true,
+    // Reading from an array or object by index might return nothing, so the type includes `undefined`.
+    // Example: const first = topics[0];  -> type is Topic | undefined; you must check it before use.
     "noUncheckedIndexedAccess": true,
+    // Only check. Never write .js files (Playwright runs .ts directly).
     "noEmit": true,
+    // Don't type-check other people's packages in node_modules (faster; not our code).
     "skipLibCheck": true
   },
+  // Check every .ts file in the repo...
   "include": ["**/*.ts"],
+  // ...except installed packages and generated reports.
   "exclude": ["node_modules", "playwright-report", "test-results"]
 }

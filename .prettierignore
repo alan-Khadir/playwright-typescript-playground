@@ -1,2 +1,8 @@
+# Files Prettier never formats (same pattern style as .gitignore).
+# Prettier also skips everything in .gitignore (node_modules, reports).
+
+# The app under test: we never change it, not even its spacing.
 webapp/
+
+# Written by npm; npm owns its layout.
 package-lock.json

@@ -1,4 +1,11 @@
 // @ts-check
+/*
+ * ESLint settings. `npm run lint` uses this file.
+ * ESLint catches RISKY CODE THAT IS STILL VALID TypeScript: bad habits and likely bugs.
+ * Example: page.goto('/');        -> error: @typescript-eslint/no-floating-promises (missing await)
+ *          Fix: await page.goto('/');
+ * It does NOT check layout (spaces, quotes): Prettier owns that (see the last block).
+ */
 import eslint from '@eslint/js';
 import { defineConfig } from 'eslint/config';
 import tseslint from 'typescript-eslint';

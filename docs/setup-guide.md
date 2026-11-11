@@ -519,7 +519,7 @@ npx playwright test --reporter=list
 
 - `Get-ChildItem -Recurse tests`: lists every file in `tests\` and its subfolders (`ls`/`dir` are short names for it). Look before you delete.
 - `Remove-Item tests\example.spec.ts`: deletes the example test file.
-- `npx playwright test --reporter=list`: runs the suite with no tests left. **Check:** `Error: No tests found` (exit code 1). This is deliberate: an empty run fails so a wrong `testDir` can't pass silently. Until the first real test (Week 1 Day 3) the `test` npm script adds `--pass-with-no-tests` (Step 10k).
+- `npx playwright test --reporter=list`: runs the suite with no tests left. **Check:** `Error: No tests found` (exit code 1). This is deliberate: an empty run fails so a wrong `testDir` can't pass silently. Until the first real test (Week 1 Day 3) the `test` npm script added `--pass-with-no-tests`; it has now been removed (Step 10k).
 
 Commit:
 
@@ -791,7 +791,7 @@ Short names for the checks, so everyone and CI run them the same way. **Where:**
 
 ```json
   "scripts": {
-    "test": "playwright test --pass-with-no-tests",
+    "test": "playwright test",
     "test:ui": "playwright test --ui",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc --noEmit",
@@ -800,14 +800,14 @@ Short names for the checks, so everyone and CI run them the same way. **Where:**
   },
 ```
 
-| Script                 | Command                                | What it does                                                                                                                      |
-| ---------------------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `npm test`             | `playwright test --pass-with-no-tests` | Runs every test. `--pass-with-no-tests` is temporary (no tests until Week 1 Day 3); removed on Day 3 so an empty run fails again. |
-| `npm run test:ui`      | `playwright test --ui`                 | UI mode, for writing and debugging tests.                                                                                         |
-| `npm run lint`         | `eslint . --max-warnings 0`            | ESLint; `--max-warnings 0` makes warnings (e.g. `waitForTimeout`) fail too.                                                       |
-| `npm run typecheck`    | `tsc --noEmit`                         | Type check only.                                                                                                                  |
-| `npm run format`       | `prettier --write .`                   | Fixes formatting. Run before committing.                                                                                          |
-| `npm run format:check` | `prettier --check .`                   | Reports formatting problems only. Used in CI.                                                                                     |
+| Script                 | Command                     | What it does                                                                                                                                                                                             |
+| ---------------------- | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm test`             | `playwright test`           | Runs every test. (Until Week 1 Day 3 it was `playwright test --pass-with-no-tests`, because there were no tests yet. Removed once the first test existed, so an empty or misconfigured run fails again.) |
+| `npm run test:ui`      | `playwright test --ui`      | UI mode, for writing and debugging tests.                                                                                                                                                                |
+| `npm run lint`         | `eslint . --max-warnings 0` | ESLint; `--max-warnings 0` makes warnings (e.g. `waitForTimeout`) fail too.                                                                                                                              |
+| `npm run typecheck`    | `tsc --noEmit`              | Type check only.                                                                                                                                                                                         |
+| `npm run format`       | `prettier --write .`        | Fixes formatting. Run before committing.                                                                                                                                                                 |
+| `npm run format:check` | `prettier --check .`        | Reports formatting problems only. Used in CI.                                                                                                                                                            |
 
 No `npx` inside scripts: npm adds `node_modules/.bin` to the PATH while a script runs, so the project's own `eslint`, `tsc`, `prettier`, `playwright` are found directly. `npm test` is the only script that works without `run`.
 
@@ -841,7 +841,7 @@ git commit -m "chore: add npm scripts for test, lint, typecheck and format"
 run: npm test
 ```
 
-(was `run: npx playwright test`). CI now runs exactly the command developers run, including `--pass-with-no-tests` until the first test exists. Lint, typecheck and format checks are added to CI in Week 1 Day 4.
+(was `run: npx playwright test`). CI now runs exactly the command developers run. (`--pass-with-no-tests` was removed in Week 1 Day 3 once the first test existed.) Lint, typecheck and format checks are added to CI in Week 1 Day 4.
 
 ```powershell
 npm run format:check
@@ -849,24 +849,59 @@ git add -A
 git commit -m "ci: run tests through npm test"
 ```
 
+## Step 11. First page object and test (Week 1 Day 3)
+
+**Where:** VS Code terminal, repo root `PS C:\git-personal\playwright-typescript-playground>`.
+
+```powershell
+git switch main                  # go to the main branch
+git pull                         # bring down the latest main from GitHub
+git switch -c feat/sign-in-tests # -c = create today's branch and switch to it
+```
+
+**Where:** VS Code Explorer → New File. Type the full path; VS Code creates the folders. (`tests/` was empty after Day 2 and Git doesn't store empty folders, so it isn't there until a file is added.)
+
+| File                                  | What it is                                                                                                                                                                                                           |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tests/pages/SignInPage.ts`           | Page object for the sign-in screen: three locators (`getByLabel('Email')`, `getByLabel('Password')`, `getByRole('button', { name: 'Sign In' })`) and two actions (`goto()`, `signIn(email, password)`). No `expect`. |
+| `tests/specs/sign-in/sign-in.spec.ts` | Test "valid user reaches the dashboard": signs in as `user@test.com` / `Password123`, then checks the URL (`toHaveURL('/html/dashboard.html')`) and the "Choose a Topic" heading (`toBeVisible()`).                  |
+
+Folder layout follows the plan: `tests/specs/<app area>/` mirrors `tests/pages/`. Details and rules: `docs/architecture.md`.
+
+**`package.json`:** the `test` script changes from `playwright test --pass-with-no-tests` to `playwright test` (Step 10k), now that a test exists.
+
+**Check (fastest first):**
+
+```powershell
+npm run format:check                          # 1. Prettier: "All matched files use Prettier code style!"
+npm run lint                                  # 2. ESLint: no output = no problems
+npm run typecheck                             # 3. tsc: no output = no type errors
+npx playwright test sign-in --reporter=list   # 4. only files whose path contains "sign-in"
+```
+
+Expected for step 4: `✓ ... tests\specs\sign-in\sign-in.spec.ts:40:3 › Sign in › valid user reaches the dashboard` and `1 passed`.
+
 ## Run, debug and report commands
 
 **Where:** VS Code terminal, in the repo root.
 
 **npm scripts vs npx.** The standard checks are npm scripts (Step 10k): `npm test`, `npm run lint`, `npm run typecheck`, `npm run format`, `npm run format:check`. Use them before every commit; CI runs the same ones, so there is one definition of each check. Use `npx playwright ...` (below) for one-off runs with your own options while exploring or debugging. Both run the same Playwright from `node_modules`; `npm test` just has the agreed flags built in.
 
-| Command                                  | What it does                                                                                                                                                                                           | When to use it                                                                                                                                    |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npx playwright test`                    | Runs every test, on every browser project in `playwright.config.ts`, headless (no visible window).                                                                                                     | Normal full run, and what CI does.                                                                                                                |
-| `npx playwright test --ui`               | Opens UI mode: pick tests, watch them run step by step, time-travel through each action, Pick locator.                                                                                                 | Writing and debugging tests day to day.                                                                                                           |
-| `npx playwright test --project=chromium` | Runs only the `chromium` project (Desktop Chrome).                                                                                                                                                     | Isolating a browser-specific failure. Since Week 1 Day 2 Chromium is the only project, so it changes nothing until more browsers return (Week 9). |
-| `npx playwright test example`            | Runs only test files whose path contains `example` (a filter, not an exact name).                                                                                                                      | Running one spec file.                                                                                                                            |
-| `npx playwright test --reporter=list`    | Same run, but prints one line per test in the terminal (✓/✘, browser, file, test name, time) instead of only writing the HTML report. Overrides `reporter` for this run only; the config is unchanged. | Quick terminal check; pasting results.                                                                                                            |
-| `npx playwright test --trace on`         | Records a trace for every test in this run (the config only records on a retry).                                                                                                                       | Debugging locally, where there are no retries.                                                                                                    |
-| `npx playwright test --debug`            | Opens a visible browser plus the Playwright Inspector, paused before the first action, to step through.                                                                                                | Investigating one failing test.                                                                                                                   |
-| `npx playwright show-report`             | Opens the last HTML report in the browser.                                                                                                                                                             | After a run, to see results and traces.                                                                                                           |
-| `npx playwright codegen`                 | Opens a browser and records your clicks as test code.                                                                                                                                                  | **Exploring only**: to see which locator Playwright suggests. Generated code is never pasted into the repo.                                       |
-| `npx playwright --version`               | Prints the installed Playwright version.                                                                                                                                                               | Checking the install; bug reports.                                                                                                                |
+**Order before every commit (fastest first):** `npm run format:check` (fix with `npm run format`) → `npm run lint` → `npm run typecheck` → `npm test`. A typo then fails in seconds, not as a confusing test failure. CI uses the same order (from Week 1 Day 4).
+
+| Command                                  | What it does                                                                                                                                                                                           | When to use it                                                                                                                                                            |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npx serve webapp --listen 3000`         | Starts the app by hand at http://localhost:3000 (uses the serve version pinned in `package.json`). Open http://localhost:3000/html/signin.html. Stop it with Ctrl+C.                                   | Looking at the app or using Pick locator / codegen. Not needed for `npm test`: Playwright starts the app itself (webServer), and reuses this one if it's already running. |
+| `npx playwright test`                    | Runs every test, on every browser project in `playwright.config.ts`, headless (no visible window).                                                                                                     | Normal full run, and what CI does.                                                                                                                                        |
+| `npx playwright test --ui`               | Opens UI mode: pick tests, watch them run step by step, time-travel through each action, Pick locator.                                                                                                 | Writing and debugging tests day to day.                                                                                                                                   |
+| `npx playwright test --project=chromium` | Runs only the `chromium` project (Desktop Chrome).                                                                                                                                                     | Isolating a browser-specific failure. Since Week 1 Day 2 Chromium is the only project, so it changes nothing until more browsers return (Week 9).                         |
+| `npx playwright test example`            | Runs only test files whose path contains `example` (a filter, not an exact name).                                                                                                                      | Running one spec file.                                                                                                                                                    |
+| `npx playwright test --reporter=list`    | Same run, but prints one line per test in the terminal (✓/✘, browser, file, test name, time) instead of only writing the HTML report. Overrides `reporter` for this run only; the config is unchanged. | Quick terminal check; pasting results.                                                                                                                                    |
+| `npx playwright test --trace on`         | Records a trace for every test in this run (the config only records on a retry).                                                                                                                       | Debugging locally, where there are no retries.                                                                                                                            |
+| `npx playwright test --debug`            | Opens a visible browser plus the Playwright Inspector, paused before the first action, to step through.                                                                                                | Investigating one failing test.                                                                                                                                           |
+| `npx playwright show-report`             | Opens the last HTML report in the browser.                                                                                                                                                             | After a run, to see results and traces.                                                                                                                                   |
+| `npx playwright codegen`                 | Opens a browser and records your clicks as test code.                                                                                                                                                  | **Exploring only**: to see which locator Playwright suggests. Generated code is never pasted into the repo.                                                               |
+| `npx playwright --version`               | Prints the installed Playwright version.                                                                                                                                                               | Checking the install; bug reports.                                                                                                                                        |
 
 `npx` runs the `playwright` command from this project's `node_modules`, so everyone uses the version in `package.json`.
 
