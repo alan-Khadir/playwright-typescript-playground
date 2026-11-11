@@ -16,7 +16,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Install Playwright Browsers
-        run: npx playwright install --with-deps
+        # Before Week 1 Day 3 (all 3 browsers + their Linux packages). Kept in case we need it,
+        # e.g. when Firefox and WebKit come back in Week 9:
+        # run: npx playwright install --with-deps
+        # Now Chromium only: the one browser in playwright.config.ts. Fewer Linux packages
+        # = faster install, and it can't fail on WebKit/Firefox package downloads.
+        run: npx playwright install --with-deps chromium
       - name: Run Playwright tests
         run: npm test
       - uses: actions/upload-artifact@v4
