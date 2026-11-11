@@ -1,5 +1,10 @@
+// VS Code settings for this repo only. Shared through Git, so everyone gets the same editor behaviour.
 {
+  // New files use LF line endings, matching .gitattributes.
   "files.eol": "\n",
+  // Use the Prettier extension to format, so the editor and `npm run format` give the same result.
   "editor.defaultFormatter": "esbenp.prettier-vscode",
+  // Format the file every time you press Ctrl+S.
+  // Note: Auto Save "afterDelay" does not trigger this; press Ctrl+S or run `npm run format`.
   "editor.formatOnSave": true
 }

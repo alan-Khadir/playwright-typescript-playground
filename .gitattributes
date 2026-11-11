@@ -1,2 +1,6 @@
-# Store and check out every text file with LF line endings, on every machine.
+# Line endings: store and check out every text file with LF (the Linux/Mac style), on every machine.
+# Why: Windows uses CRLF. Without this, a Windows commit can make every line of a file look changed,
+#      and Git warns "LF will be replaced by CRLF". CI runs on Linux, so LF everywhere keeps them equal.
+# text=auto: Git decides which files are text; binary files (images, zips) are left alone.
+# Example: you save a file on Windows with CRLF; `git add` stores it with LF.
 * text=auto eol=lf
