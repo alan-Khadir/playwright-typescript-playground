@@ -41,8 +41,8 @@ import type { Locator, Page } from '@playwright/test';
 // `export` = other files may use this class. Without it, the spec's
 //   import { SignInPage } from '../../pages/SignInPage';  -> error: not exported
 export class SignInPage {
-  // PROPERTIES = named values stored on each copy. This class has four:
-  // emailInput, passwordInput, signInButton and errorMessage. Each property holds a Locator.
+  // PROPERTIES = named values stored on each copy. This class has five:
+  // emailInput, passwordInput, signInButton, errorMessage and heading. Each property holds a Locator.
   // A spec reads them with a dot, e.g. signInPage.signInButton
   // `readonly` = filled once in the constructor below, then never overwritten. e.g.
   //   signInPage.emailInput = page.getByLabel('Name');
@@ -64,6 +64,7 @@ export class SignInPage {
   // https://playwright.dev/docs/pom  (readonly tocList: Locator)
   // Full comparison of the 4 options: docs/architecture.md, "Page objects".
   readonly errorMessage: Locator;
+  readonly heading: Locator;
 
   // WHAT IS A CONSTRUCTOR?
   // The setup code that runs once, at the moment a test writes `new SignInPage(page)`.
@@ -78,7 +79,7 @@ export class SignInPage {
   //     so specs go through our methods (goto, signIn) instead,
   //   - `readonly`: it can't be overwritten with another tab later.
   constructor(private readonly page: Page) {
-    // Set the four properties. This only SAVES how to find each element.
+    // Set the five properties. This only SAVES how to find each element.
     // Nothing is searched for yet: Playwright looks when fill() or click() runs.
 
     // The input field whose label says "Email". The HTML links them:
@@ -116,6 +117,8 @@ export class SignInPage {
     this.errorMessage = page
       .getByRole('main')
       .getByText('Invalid email or password.');
+
+    this.heading = page.getByRole('heading', { name: 'Sign In' });
   }
 
   // WHAT IS A METHOD?

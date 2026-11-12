@@ -9,9 +9,15 @@ Folders are created when the first file needs them, so this grows week by week.
 ```
 webapp/               the app under test. Never changed to make a test pass.
 docs/                 setup-guide.md, architecture.md (decisions/ added with record 001)
+tests/
+  specs/<app area>/   the tests and every expect, one folder per screen the tests start on
+    sign-in/sign-in.spec.ts
+    home/home.spec.ts
+  pages/              one page object per screen: locators and actions, no expect
+    SignInPage.ts  HomePage.ts  DashboardPage.ts  CreateAccountPage.ts  TaskBoardPage.ts
 ```
 
-Planned next (Week 1): `tests/specs/<app area>/*.spec.ts` hold the tests and every `expect`; `tests/pages/` holds one page object per screen, mirroring specs. Example: `tests/specs/sign-in/sign-in.spec.ts` uses `tests/pages/SignInPage.ts`.
+A page object is created the first time a test touches that screen, with only what that test uses (e.g. `CreateAccountPage` has just `heading` until Week 3). `tests/components/` is added when a part of the page (e.g. the Main navigation) is used by page objects for 2+ screens.
 
 ## Rules we follow
 
@@ -160,9 +166,11 @@ async signIn(email: string, password: string): Promise<void> {}
 ### Page objects
 
 - Page objects hold locators and actions only. Every `expect` lives in the spec.
-- Anything a spec needs to check is a `readonly` Locator property on the page object; the spec asserts on it with a web-first assertion.
+- Every user action goes through a page object method, even a single click (`homePage.openSignIn()`). Specs never call `click()` or `fill()` directly.
+- Anything a spec needs to check is a `readonly` Locator property on the page object; the spec asserts on it with a web-first assertion. Specs hold no locators of their own.
+- A page object stores the tab (`private readonly page: Page`) only if a method uses `this.page` later (e.g. `goto()`). Otherwise the constructor takes `page: Page` as a plain input.
 - Composition over inheritance: no `BasePage` or `BaseTest`.
-- No wrappers around Playwright's own API (no custom click, wait, retry or log helpers).
+- No wrappers around Playwright's own API: no GENERIC helpers such as `clickElement(locator)` or custom wait, retry or log functions. A page-specific user action like `openSignIn()` is not a wrapper.
 - At most three hops from a test to a locator: spec → page object → Playwright.
 
 How a spec checks something the page object finds (example: the sign-in error):
@@ -184,6 +192,26 @@ await expect(signInPage.errorMessage).toBeVisible();
 `await` never retries; it only waits for a Promise to finish. The retrying comes from the web-first assertion, and only when `expect` is given a Locator (or the page). Sources: [Assertions](https://playwright.dev/docs/test-assertions), [Best practices: web-first assertions](https://playwright.dev/docs/best-practices#use-web-first-assertions), Martin Fowler's [PageObject](https://martinfowler.com/bliki/PageObject.html) (no assertions in page objects).
 
 Source: [Page object models](https://playwright.dev/docs/pom).
+
+### Naming
+
+| What                               | Pattern                                                               | Examples                                                                  |
+| ---------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| Open this page directly by its URL | `goto()` (one word, like Playwright's `page.goto()`)                  | `homePage.goto()`, `signInPage.goto()`                                    |
+| Reach another page through the UI  | `open` + destination page object name without `Page`                  | `openSignIn()` → `SignInPage`, `openCreateAccount()`, `openTaskBoard()`   |
+| Any other user action              | the user's verb                                                       | `signIn(email, password)`                                                 |
+| Locator properties                 | what it is + kind of element; links use their text                    | `emailInput`, `signInButton`, `loginLink`, `errorMessage`, `heading`      |
+| Page object classes and files      | PascalCase + `Page`, file named the same                              | `CreateAccountPage` in `CreateAccountPage.ts`                             |
+| Test titles                        | what the user does + expected result, lowercase except on-screen text | `'Login link opens the sign-in page'`, `'wrong password shows the error'` |
+
+Name the user's goal, not the mechanics:
+
+```ts
+// ✘ Wrong: describes the UI. Untrue if the link becomes a button or its text changes.
+await homePage.clickLoginLink();
+// ✔ Right: describes what the user wants.
+await homePage.openSignIn();
+```
 
 ### Where we differ from the docs on purpose
 

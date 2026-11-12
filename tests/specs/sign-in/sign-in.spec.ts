@@ -13,6 +13,7 @@ import { test, expect } from '@playwright/test';
 //   tests/specs/sign-in/  --..-->  tests/specs/  --..-->  tests/  -->  pages/SignInPage
 // (No .ts at the end: TypeScript finds SignInPage.ts by itself.)
 import { SignInPage } from '../../pages/SignInPage';
+import { DashboardPage } from '../../pages/DashboardPage';
 
 // test.describe('Sign in', () => { ... }) groups related tests under one name.
 // The HTML report then shows each test as:
@@ -45,8 +46,9 @@ test.describe('Sign in', () => {
     //   signInPage = new SignInPage(page);         // later line: give it a new value
     // `npm run typecheck` reports: Cannot assign to 'signInPage' because it is a constant.
     // `new SignInPage(page)` = build this test's own SignInPage object, using this test's
-    // tab. This runs the constructor in SignInPage.ts, which sets the four locators.
+    // tab. This runs the constructor in SignInPage.ts, which sets the five locators.
     const signInPage = new SignInPage(page);
+    const dashboardPage = new DashboardPage(page);
 
     // The user's steps, in order. Each method returns a Promise, so each is awaited:
     // finish this step before starting the next.
@@ -67,9 +69,7 @@ test.describe('Sign in', () => {
     // element is on the screen and not hidden; fail if it never is.
     // The heading on the page reads "🧪 Choose a Topic". `name` matches part of the
     // text by default, so 'Choose a Topic' finds it without typing the emoji.
-    await expect(
-      page.getByRole('heading', { name: 'Choose a Topic' }),
-    ).toBeVisible();
+    await expect(dashboardPage.heading).toBeVisible();
   });
 
   test('wrong password shows the error', async ({ page }) => {
