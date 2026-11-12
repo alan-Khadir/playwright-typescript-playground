@@ -41,8 +41,8 @@ import type { Locator, Page } from '@playwright/test';
 // `export` = other files may use this class. Without it, the spec's
 //   import { SignInPage } from '../../pages/SignInPage';  -> error: not exported
 export class SignInPage {
-  // PROPERTIES = named values stored on each copy. This class has three:
-  // emailInput, passwordInput and signInButton. Each property holds a Locator.
+  // PROPERTIES = named values stored on each copy. This class has four:
+  // emailInput, passwordInput, signInButton and errorMessage. Each property holds a Locator.
   // A spec reads them with a dot, e.g. signInPage.signInButton
   // `readonly` = filled once in the constructor below, then never overwritten. e.g.
   //   signInPage.emailInput = page.getByLabel('Name');
@@ -50,6 +50,20 @@ export class SignInPage {
   readonly emailInput: Locator;
   readonly passwordInput: Locator;
   readonly signInButton: Locator;
+  // The error text shown under the form after a wrong email or password.
+  // WHY A PROPERTY, NOT A METHOD THAT RETURNS THE TEXT:
+  //   ✘ async getErrorText() { return await this.errorMessage.textContent(); }
+  //     spec: expect(await signInPage.getErrorText()).toBe('Invalid email or password.');
+  //     textContent() reads the text ONCE. If the app hasn't shown the error yet,
+  //     it reads '' and toBe fails straight away: no retry = flaky.
+  //   ✔ readonly errorMessage: Locator;
+  //     spec: await expect(signInPage.errorMessage).toBeVisible();
+  //     expect() gets the Locator, so toBeVisible() re-checks for up to 5 seconds.
+  // The spec does the check (every expect lives in the spec); this file only says
+  // how to FIND the element. Same pattern as Playwright's own example:
+  // https://playwright.dev/docs/pom  (readonly tocList: Locator)
+  // Full comparison of the 4 options: docs/architecture.md, "Page objects".
+  readonly errorMessage: Locator;
 
   // WHAT IS A CONSTRUCTOR?
   // The setup code that runs once, at the moment a test writes `new SignInPage(page)`.
@@ -64,18 +78,44 @@ export class SignInPage {
   //     so specs go through our methods (goto, signIn) instead,
   //   - `readonly`: it can't be overwritten with another tab later.
   constructor(private readonly page: Page) {
-    // Set the three properties. This only SAVES how to find each element.
+    // Set the four properties. This only SAVES how to find each element.
     // Nothing is searched for yet: Playwright looks when fill() or click() runs.
 
     // The input field whose label says "Email". The HTML links them:
     //   <label for="email">Email</label>  +  <input id="email">  (for matches id)
     this.emailInput = page.getByLabel('Email');
-    // Same for Password. (getByRole can't find a password field: it has no role.)
+    // Same for Password. getByRole('textbox', { name: 'Password' }) would also work
+    // (Playwright treats a password input as a textbox, though the W3C table
+    // https://www.w3.org/TR/html-aria/ says "no role"), but getByLabel is the
+    // recommended locator for form fields, and it matches the Email line above.
     this.passwordInput = page.getByLabel('Password');
     // The element a screen reader announces as a "button" called "Sign In".
     // getByText('Sign In') would ALSO match the <h1>Sign In</h1> heading:
     // 2 matches = strict mode error. getByRole matches only the button.
     this.signInButton = page.getByRole('button', { name: 'Sign In' });
+    // The error is a <div> with no role (a div's role is "generic"; aria-live="polite"
+    // only tells screen readers to read new text, it adds no role). It's not a form
+    // field either, so getByRole and getByLabel can't find it. Next in the list:
+    // getByText, for plain text in div/span/p.
+    // https://playwright.dev/docs/locators#locate-by-text
+    // Which tag gets which role: https://www.w3.org/TR/html-aria/
+    // (check in Chrome DevTools > Elements > Accessibility tab)
+    //
+    // STRICT MODE: the app shows this text TWICE: under the form AND in a pop-up
+    // (a "toast", role alert) in the corner. page.getByText(...) alone matches both:
+    //   ✘ page.getByText('Invalid email or password.')
+    //     -> Error: strict mode violation: ... resolved to 2 elements
+    // A locator used to act or check must match exactly ONE element.
+    //   ✘ .first() would also pass, but picks whichever comes first today; if the
+    //     page changes it silently checks the toast instead.
+    //   ✔ Scope it: page.getByRole('main') = the <main> area (role main). Calling
+    //     .getByText() ON it searches only inside main. The form message is inside
+    //     main; the toast is added outside it, at the end of the page. 1 match.
+    // https://playwright.dev/docs/locators#strictness
+    // https://playwright.dev/docs/locators#matching-inside-a-locator
+    this.errorMessage = page
+      .getByRole('main')
+      .getByText('Invalid email or password.');
   }
 
   // WHAT IS A METHOD?
