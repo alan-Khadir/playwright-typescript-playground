@@ -30,8 +30,29 @@ page.getByLabel('Email');
 ```
 
 - `getByRole` for things you interact with (buttons, links, inputs); `getByText` for plain text (div, span, p).
-- Form fields: `getByLabel` (a password input has no ARIA role, so `getByRole` can't find it; using `getByLabel` for every field keeps them consistent).
+- Form fields: `getByLabel`, as the Locators page recommends for form controls. It reads the same for every field, and it fails if the label is missing or no longer linked to the field.
 - Test IDs are stable but not user-facing: they still pass if the label is missing. Use them only when there is no stable text or role.
+
+#### Which elements `getByRole` can find
+
+`getByRole` searches the role the browser gives each element, not the HTML tag. Full mapping: W3C [ARIA in HTML](https://www.w3.org/TR/html-aria/). Check any element in Chrome DevTools → Elements → **Accessibility** tab (Role, Name). When the W3C table and the browser disagree, trust Playwright's page snapshot (in `test-results/<test>/error-context.md` after a failure).
+
+| HTML                                            | Role                              | Locator to use                                       |
+| ----------------------------------------------- | --------------------------------- | ---------------------------------------------------- |
+| `button`, `input type="submit"` / `"button"`    | button                            | `getByRole('button', { name: 'Sign In' })`           |
+| `a` with `href`                                 | link                              | `getByRole('link', { name: 'Login' })`               |
+| `h1` to `h6`                                    | heading                           | `getByRole('heading', { name: 'Choose a Topic' })`   |
+| `input type="text"` / `"email"`, `textarea`     | textbox                           | `getByLabel('Email')` (form fields: always by label) |
+| `input type="password"`                         | textbox in Playwright (W3C: none) | `getByLabel('Password')`                             |
+| `input type="checkbox"` / `"radio"` / `"range"` | checkbox / radio / slider         | `getByRole(...)` or `getByLabel(...)`                |
+| `select`                                        | combobox                          | `getByLabel(...)`, act with `selectOption()`         |
+| `img` with `alt`                                | img                               | `getByRole('img', { name })` or `getByAltText`       |
+| `main`, `nav`                                   | main, navigation                  | for scoping: `getByRole('main').getBy...`            |
+| `form` with no name                             | none in Playwright                | `getByRole('form')` finds it only with `aria-label`  |
+| `div`, `span`, `a` without `href`               | generic (no useful role)          | `getByText(...)`                                     |
+
+- `role="..."` on an element overrides the tag (e.g. `div role="alert"` is an alert).
+- `aria-label` gives a name, not a role. `aria-live` gives neither: the sign-in error `div` has `aria-live="polite"` and is still generic, so we use `getByText`.
 
 ### Strict mode: one locator, one element
 
@@ -139,9 +160,28 @@ async signIn(email: string, password: string): Promise<void> {}
 ### Page objects
 
 - Page objects hold locators and actions only. Every `expect` lives in the spec.
+- Anything a spec needs to check is a `readonly` Locator property on the page object; the spec asserts on it with a web-first assertion.
 - Composition over inheritance: no `BasePage` or `BaseTest`.
 - No wrappers around Playwright's own API (no custom click, wait, retry or log helpers).
 - At most three hops from a test to a locator: spec → page object → Playwright.
+
+How a spec checks something the page object finds (example: the sign-in error):
+
+| Option                                                                                               | Verdict      | Why                                                                                                                               |
+| ---------------------------------------------------------------------------------------------------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Method returns the text; spec does `expect(text).toBe(...)`                                       | ✘ Rejected   | Reads the text once, no retry: flaky.                                                                                             |
+| 2. `expect` inside the page object (`await signInPage.expectErrorVisible()`)                         | ✘ Not here   | Retries, but hides the check from the spec and breaks "every expect in the spec".                                                 |
+| 3. Method returns the Locator (`getErrorMessage(): Locator`)                                         | ✘ Unneeded   | Same as 4 with an extra method that does nothing.                                                                                 |
+| 4. `readonly errorMessage: Locator`; spec does `await expect(signInPage.errorMessage).toBeVisible()` | ✔ We do this | Retries (web-first), locator in one place, check visible in the spec. Same as the [POM](https://playwright.dev/docs/pom) example. |
+
+```ts
+// ✘ Wrong: reads the text once. If the error isn't shown yet, '' !== expected -> fails, no retry.
+expect(await signInPage.getErrorText()).toBe('Invalid email or password.');
+// ✔ Right: expect gets the Locator, so toBeVisible() re-checks for up to 5 seconds.
+await expect(signInPage.errorMessage).toBeVisible();
+```
+
+`await` never retries; it only waits for a Promise to finish. The retrying comes from the web-first assertion, and only when `expect` is given a Locator (or the page). Sources: [Assertions](https://playwright.dev/docs/test-assertions), [Best practices: web-first assertions](https://playwright.dev/docs/best-practices#use-web-first-assertions), Martin Fowler's [PageObject](https://martinfowler.com/bliki/PageObject.html) (no assertions in page objects).
 
 Source: [Page object models](https://playwright.dev/docs/pom).
 
@@ -160,3 +200,4 @@ The pages these rules come from. Check them before adding a new pattern, and rea
 - Framework: [Page object models](https://playwright.dev/docs/pom), [Fixtures](https://playwright.dev/docs/test-fixtures), [Authentication](https://playwright.dev/docs/auth), [Annotations and tags](https://playwright.dev/docs/test-annotations), [Retries](https://playwright.dev/docs/test-retries), [Parallelism](https://playwright.dev/docs/test-parallel)
 - Later: [Mock APIs](https://playwright.dev/docs/mock), [API testing](https://playwright.dev/docs/api-testing), [Accessibility testing](https://playwright.dev/docs/accessibility-testing), [ARIA snapshots](https://playwright.dev/docs/aria-snapshots), [Visual comparisons](https://playwright.dev/docs/test-snapshots), [Emulation](https://playwright.dev/docs/emulation), [CI](https://playwright.dev/docs/ci)
 - TypeScript: [Handbook](https://www.typescriptlang.org/docs/handbook/intro.html), [tsconfig reference](https://www.typescriptlang.org/tsconfig/)
+- Accessibility roles: W3C [ARIA in HTML](https://www.w3.org/TR/html-aria/) (which role each HTML tag gets; what `getByRole` searches). When it disagrees with the browser, trust Playwright's page snapshot.

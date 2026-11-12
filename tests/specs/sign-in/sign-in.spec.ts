@@ -45,7 +45,7 @@ test.describe('Sign in', () => {
     //   signInPage = new SignInPage(page);         // later line: give it a new value
     // `npm run typecheck` reports: Cannot assign to 'signInPage' because it is a constant.
     // `new SignInPage(page)` = build this test's own SignInPage object, using this test's
-    // tab. This runs the constructor in SignInPage.ts, which sets the three locators.
+    // tab. This runs the constructor in SignInPage.ts, which sets the four locators.
     const signInPage = new SignInPage(page);
 
     // The user's steps, in order. Each method returns a Promise, so each is awaited:
@@ -70,5 +70,21 @@ test.describe('Sign in', () => {
     await expect(
       page.getByRole('heading', { name: 'Choose a Topic' }),
     ).toBeVisible();
+  });
+
+  test('wrong password shows the error', async ({ page }) => {
+    const signInPage = new SignInPage(page);
+
+    await signInPage.goto();
+    // A wrong password, so the app should refuse to sign in.
+    // signIn() is reused: the values come from the test, not the page object.
+    await signInPage.signIn('user@test.com', 'wrongpassword');
+
+    // CHECK: the error message is shown.
+    // `await` itself never retries: it only waits for one Promise to finish.
+    // The retrying comes from toBeVisible(), because expect() was given a
+    // LOCATOR (signInPage.errorMessage), which it can search for again and again
+    // for up to 5 seconds. https://playwright.dev/docs/test-assertions
+    await expect(signInPage.errorMessage).toBeVisible();
   });
 });
