@@ -2,9 +2,28 @@
 
 Playwright + TypeScript test automation framework for a static web app: page objects, fixtures, CI on GitHub Actions.
 
+## What it tests
+
+`webapp/` is a static HTML/JS "Testing Playground" (no backend; data in `localStorage` and `topics.json`). Playwright starts it with `serve` on http://localhost:3000 before the tests run. One test user: `user@test.com` / `Password123`.
+
+Tests live in `tests/specs/`, one folder per screen (e.g. `sign-in/`, `home/`), and run on Chromium.
+
+## Quick start
+
+Needs Node 24 and Git. Full setup from a new machine, with every step explained: [docs/setup-guide.md](docs/setup-guide.md).
+
+```powershell
+git clone https://github.com/alan-Khadir/playwright-typescript-playground.git   # copy the repo to your PC
+cd playwright-typescript-playground                                               # go into the repo folder
+npm ci                                                                            # install the exact package versions from package-lock.json
+npx playwright install chromium                                                   # download the browser the tests use
+npm test                                                                          # start the app and run every test
+npx playwright show-report                                                        # open the HTML report of the last run
+```
+
 ## Commands
 
-Run from the repo root. Full setup, from a new machine: [docs/setup-guide.md](docs/setup-guide.md).
+Run from the repo root.
 
 | Command                | What it does                                                     |
 | ---------------------- | ---------------------------------------------------------------- |
@@ -23,6 +42,8 @@ npm run lint           # 2. ESLint: bad habits, e.g. a missing await
 npm run typecheck      # 3. tsc: wrong types
 npm test               # 4. the tests: slowest, so last
 ```
+
+GitHub Actions runs the same four checks, in the same order, on every pull request into `main` and on every merge to `main` ([.github/workflows/playwright.yml](.github/workflows/playwright.yml)). The HTML report is uploaded to each run as the `playwright-report` artifact.
 
 ## Guardrails
 
@@ -43,7 +64,8 @@ Checks that stop bad code reaching `main`. Each one catches a different kind of 
 Checks every value has the right type before a test runs. Settings: `tsconfig.json`.
 
 ```ts
-// ✘ Wrong: text where a number is expected. tsc: Type 'string' is not assignable to type 'number'.
+// ✘ Wrong: text where a number is expected.
+// npm run typecheck reports: Type 'string' is not assignable to type 'number'.
 const timeout: number = '5000';
 // ✔ Right
 const timeout: number = 5000;
@@ -79,9 +101,10 @@ await expect(
 
 Formats layout so every file looks the same and reviews show only real changes. Settings: `.prettierrc.json` (single quotes) and `.prettierignore` (files to skip). ESLint's own layout rules are switched off (`eslint-config-prettier`), so the two never argue.
 
+<!-- prettier-ignore -->
 ```ts
 // ✘ Wrong: double quotes, missing spaces. `npm run format:check` reports it.
-const email = 'user@test.com';
+const email="user@test.com"
 // ✔ Right: what `npm run format` turns it into.
 const email = 'user@test.com';
 ```
@@ -98,12 +121,23 @@ Every text file is stored with LF line endings, whatever machine it was saved on
 `package.json` says which versions are allowed. `package-lock.json` records the exact versions installed. CI runs `npm ci`, which installs exactly what the lock file says.
 
 ```jsonc
-// ✘ Wrong: "^" allows TypeScript 7, which typescript-eslint can't use yet, so the install fails.
+// ✘ Wrong: "^" allows any 6.x, e.g. 6.1, but typescript-eslint 8 only supports TypeScript below 6.1,
+// so a fresh install could pick a version our linter can't use.
 "typescript": "^6.0.3"
-// ✔ Right: "~" allows 6.0.x patch fixes only.
+// ✔ Right: "~" allows 6.0.x patch fixes only. Why: docs/decisions/001-week-1-tooling-and-workflow.md
 "typescript": "~6.0"
 ```
 
 ### Pull request + green Actions
 
 We never push to `main` directly. Every change goes on a branch, such as `feat/sign-in-tests`, then through a pull request. It is squash-merged only when GitHub Actions is green.
+
+## Documentation
+
+| Document                                     | What's in it                                                               |
+| -------------------------------------------- | -------------------------------------------------------------------------- |
+| [docs/setup-guide.md](docs/setup-guide.md)   | Every tool, install command and config file; Git workflow; Troubleshooting |
+| [docs/architecture.md](docs/architecture.md) | Folder structure, the rules every test follows, naming                     |
+| [docs/decisions/](docs/decisions/)           | Decision records: what we chose, why, and what we rejected                 |
+
+App bugs are raised as [GitHub Issues](https://github.com/alan-Khadir/playwright-typescript-playground/issues) with the `bug` label.

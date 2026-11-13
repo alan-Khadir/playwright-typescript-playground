@@ -18,12 +18,12 @@ Copied from the plan. npm packages are added in the week they are first used, no
 
 | Purpose          | Tool                                                                                             | What it is for                                                                                                                                                                                                   | Status                                                                                                                       |
 | ---------------- | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| Core             | Node.js LTS (22+)                                                                                | Runs JavaScript and TypeScript outside the browser. Playwright is a Node library, so the tests run on Node.                                                                                                      | installed (Step 1)                                                                                                           |
+| Core             | Node.js 24 (LTS)                                                                                 | Runs JavaScript and TypeScript outside the browser. Playwright is a Node library, so the tests run on Node.                                                                                                      | installed (Step 1)                                                                                                           |
 | Core             | npm                                                                                              | Node's package manager: installs libraries listed in package.json and runs npm scripts. Comes with Node.                                                                                                         | installed (Step 1)                                                                                                           |
 | Core             | Git                                                                                              | Version control: history of every change, branches, and clone/push to GitHub.                                                                                                                                    | installed (Step 1)                                                                                                           |
 | Core             | @playwright/test                                                                                 | Playwright's test runner and browser automation library: `test`, `expect`, locators, fixtures, reports. Dev dependency.                                                                                          | installed Week 1 Day 1 (Step 7)                                                                                              |
 | Core             | TypeScript                                                                                       | JavaScript with types, so mistakes are caught in the editor before a test runs. Playwright runs .ts files directly without it; the `typescript` package is only needed for `tsc --noEmit` and typescript-eslint. | Playwright handles .ts from Day 1; `typescript@~6.0` installed Week 1 Day 2 (Step 10g); pinned below 7 for typescript-eslint |
-| Core             | @types/node                                                                                      | Type definitions for Node's built-in modules (e.g. `process.env`), so TypeScript understands them. Dev dependency.                                                                                               | installed Week 1 Day 1 (Step 7)                                                                                              |
+| Core             | @types/node                                                                                      | Type definitions for Node's built-in modules (e.g. `process.env`), so TypeScript understands them. Dev dependency.                                                                                               | installed Week 1 Day 1 (Step 7); set to ^24 to match Node 24 in Week 1 Day 5 (Step 10m)                                      |
 | Serving the app  | serve                                                                                            | Small static web server that serves `webapp/` at http://localhost:3000. Dev dependency so CI runs the same version.                                                                                              | npx on Day 1; installed as dev dependency Week 1 Day 2 (Step 10d)                                                            |
 | Editor           | VS Code                                                                                          | Code editor; `code` is its command-line launcher.                                                                                                                                                                | installed (Step 1)                                                                                                           |
 | Editor           | Playwright Test for VS Code                                                                      | Run and debug tests from the editor; Pick locator.                                                                                                                                                               | installed (Step 2)                                                                                                           |
@@ -841,7 +841,7 @@ git commit -m "chore: add npm scripts for test, lint, typecheck and format"
 run: npm test
 ```
 
-(was `run: npx playwright test`). CI now runs exactly the command developers run. (`--pass-with-no-tests` was removed in Week 1 Day 3 once the first test existed.) Lint, typecheck and format checks are added to CI in Week 1 Day 4.
+(was `run: npx playwright test`). CI now runs exactly the command developers run. (`--pass-with-no-tests` was removed in Week 1 Day 3 once the first test existed.) Format, lint and typecheck checks were added to CI in Week 1 Day 5 (Step 10m).
 
 **Week 1 Day 3 change:** in `.github/workflows/playwright.yml` the browser step is now `run: npx playwright install --with-deps chromium` (was `npx playwright install --with-deps`). We only test on Chromium, and installing all three browsers' Linux packages was slow and failed when Ubuntu's package servers were unreachable (see Troubleshooting).
 
@@ -850,6 +850,36 @@ npm run format:check
 git add -A
 git commit -m "ci: run tests through npm test"
 ```
+
+### 10m. CI runs all four checks, Node pinned (Week 1 Day 5)
+
+**Why:** CI now runs the same four checks as before a commit, in the same order (fastest first). Decision record 001 explains each choice.
+
+**1. Match `@types/node` to Node 24** (PowerShell, repo root):
+
+```powershell
+node -v                                   # check the Node you run, e.g. v24.16.0
+npm install --save-dev @types/node@24     # Node's type definitions for version 24; package.json now says "^24.x.x"
+```
+
+**2. Replace `.github\workflows\playwright.yml`** with the version in the repo. What changed:
+
+| Change                                                                                    | Why                                                                                                       |
+| ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `actions/checkout@v7`, `actions/setup-node@v7`, `actions/upload-artifact@v7` (were `@v4`) | Latest major versions; v4 ran on Node 20, which GitHub Actions has deprecated (the warning on every run). |
+| `node-version: 24` (was `lts/*`)                                                          | CI runs the same Node major version as our machines; `lts/*` changes on its own.                          |
+| New steps: `npm run format:check`, `npm run lint`, `npm run typecheck`                    | Same checks as locally, fastest first, before the browser install so a failure stops CI in seconds.       |
+
+**3. Run the checks, then commit:**
+
+```powershell
+npm run format:check   # 1. Prettier: layout (if it fails: npm run format)
+npm run lint           # 2. ESLint
+npm run typecheck      # 3. tsc
+npm test               # 4. the tests
+```
+
+On GitHub, open the PR's **Checks** tab: the job shows each step with a tick. A failing step shows a red cross and every later step is skipped.
 
 ## Step 11. First page object and test (Week 1 Day 3)
 
@@ -1071,3 +1101,4 @@ git log --oneline
 | Windows Firewall popup on first `npx serve`                                                                                                                                                     | Node is opening a network port                                                                                                                                                                                        | Allow **Private networks** only.                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `warning: in the working copy of '...', LF will be replaced by CRLF the next time Git touches it` on `git add`                                                                                  | Git for Windows converts line endings: files use LF (Unix style) in the repo and CRLF (Windows style) on disk (`core.autocrlf=true`).                                                                                 | Fixed by `.gitattributes` (`* text=auto eol=lf`, Step 10c): Git now stores and checks out LF on every machine. If an old clone still shows CRLF in the VS Code status bar, commit your work, then run `git rm -r -q --cached .` and `git reset --hard`.                                                                                                                                                                            |
 | CI step "Install Playwright Browsers" runs for 10+ minutes (normally under a minute; whole job ~1 min)                                                                                          | The runner is stuck downloading a browser or Linux packages (`--with-deps` uses apt): a slow mirror or a network hang on GitHub's side, not your code.                                                                | Expand the step's log. If the last line hasn't changed for several minutes, click **Cancel workflow**, then **Re-run all jobs**. The workflow's `timeout-minutes: 60` would stop it eventually. Seen 2026-11-09: stuck in apt at `Get:109 ... libdecor-0-0` from azure.archive.ubuntu.com. If it keeps happening: cache browsers between runs, or run the job in the official Playwright Docker image (dependencies preinstalled). |
+| CI warning `No files were found with the provided path: playwright-report/` on the upload step                                                                                                  | A check before the tests (format, lint or typecheck) failed, so the tests never ran and no report exists. The upload step still runs (`if: ${{ !cancelled() }}`) and finds nothing.                                   | Harmless. Fix the failing check (its step has the red cross); the warning goes away. (Week 1 Day 5)                                                                                                                                                                                                                                                                                                                                |

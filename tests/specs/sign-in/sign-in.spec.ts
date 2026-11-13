@@ -61,6 +61,8 @@ test.describe('Sign in', () => {
     //   http://localhost:3000/html/dashboard.html
     // It keeps re-checking for up to 5 seconds (the redirect after clicking takes a
     // moment) and only fails if the address never matches. No manual waits needed.
+    // ✘ expect(page.url()).toBe('...') reads the address ONCE (a plain string): no retry.
+    // ✔ Give expect the tab (page). More ✘/✔: docs/architecture.md, "Checking the URL".
     await expect(page).toHaveURL('/html/dashboard.html');
 
     // CHECK 2: the user can actually SEE the dashboard.

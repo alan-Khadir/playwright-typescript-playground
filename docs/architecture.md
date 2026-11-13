@@ -8,7 +8,8 @@ Folders are created when the first file needs them, so this grows week by week.
 
 ```
 webapp/               the app under test. Never changed to make a test pass.
-docs/                 setup-guide.md, architecture.md (decisions/ added with record 001)
+docs/                 setup-guide.md, architecture.md
+  decisions/          one file per decision record, e.g. 001-week-1-tooling-and-workflow.md
 tests/
   specs/<app area>/   the tests and every expect, one folder per screen the tests start on
     sign-in/sign-in.spec.ts
@@ -95,13 +96,13 @@ await expect(
 
 Use the matching web-first assertion, never a one-off read of the value:
 
-| ✔ Use (retries)                               | ✘ Not (checks once, flaky)                            |
-| --------------------------------------------- | ----------------------------------------------------- |
-| `await expect(locator).toBeVisible()`         | `expect(await locator.isVisible()).toBe(true)`        |
-| `await expect(locator).toHaveText('Welcome')` | `expect(await locator.textContent()).toBe('Welcome')` |
-| `await expect(page).toHaveURL(/dashboard/)`   | `expect(page.url()).toContain('dashboard')`           |
-| `await expect(locator).toHaveCount(3)`        | `expect(await locator.count()).toBe(3)`               |
-| `await expect(locator).toHaveValue('hello')`  | `expect(await locator.inputValue()).toBe('hello')`    |
+| ✔ Use (retries)                                        | ✘ Not (checks once, flaky)                            |
+| ------------------------------------------------------ | ----------------------------------------------------- |
+| `await expect(locator).toBeVisible()`                  | `expect(await locator.isVisible()).toBe(true)`        |
+| `await expect(locator).toHaveText('Welcome')`          | `expect(await locator.textContent()).toBe('Welcome')` |
+| `await expect(page).toHaveURL('/html/dashboard.html')` | `expect(page.url()).toContain('dashboard')`           |
+| `await expect(locator).toHaveCount(3)`                 | `expect(await locator.count()).toBe(3)`               |
+| `await expect(locator).toHaveValue('hello')`           | `expect(await locator.inputValue()).toBe('hello')`    |
 
 Don't check what Playwright already checks before an action. Before `click()` or `fill()` it waits for the element to be visible, stable, enabled and not covered.
 Source: [Auto-waiting](https://playwright.dev/docs/actionability).
@@ -120,7 +121,53 @@ Don't wait for "the network to go quiet". Wait for what the user sees.
 // ✘ Wrong: discouraged in the docs; slow and unreliable.
 await page.waitForLoadState('networkidle');
 // ✔ Right: wait for the result the user expects.
+await expect(page).toHaveURL('/html/dashboard.html');
+```
+
+#### Checking the URL
+
+After an action that changes page (sign in, click a link), check the URL with `toHaveURL`, then check something the user sees on the new page.
+Source: [toHaveURL](https://playwright.dev/docs/api/class-pageassertions#page-assertions-to-have-url), [Assertions](https://playwright.dev/docs/test-assertions).
+
+- Give `expect` the tab (`page`), not a value read from it. Then it re-reads the URL until it matches, for up to 5 seconds.
+- Use the path only. A string is joined to `baseURL` (`http://localhost:3000` in `playwright.config.ts`), so `'/html/dashboard.html'` means `http://localhost:3000/html/dashboard.html`.
+- A string must match the **whole** URL, including any `?query`. Use a regular expression only when part of the URL changes from run to run (e.g. an id).
+- The URL alone isn't proof: a blank or broken page can have the right address. Follow it with a check the user would see, e.g. the page heading.
+
+```ts
+// ✔ Right: our pattern. Retries, exact path, then what the user sees.
+await expect(page).toHaveURL('/html/dashboard.html');
+await expect(dashboardPage.heading).toBeVisible();
+
+// ✘ Wrong: page.url() reads the address ONCE and returns a plain string. No retry: fails if the redirect is slow.
+expect(page.url()).toBe('http://localhost:3000/html/dashboard.html');
+// ✔ Right
+await expect(page).toHaveURL('/html/dashboard.html');
+
+// ✘ Wrong: page.url without () is the method itself, and toHaveURL only works on a Page.
+// npm run typecheck flags it.
+await expect(page.url).toHaveURL('/html/dashboard.html');
+// ✔ Right
+await expect(page).toHaveURL('/html/dashboard.html');
+
+// ✘ Wrong: the full address hard-coded. Breaks when baseURL changes (another port, a test server).
+await expect(page).toHaveURL('http://localhost:3000/html/dashboard.html');
+// ✔ Right: path only; baseURL is added for you.
+await expect(page).toHaveURL('/html/dashboard.html');
+
+// ✘ Wrong: too loose. Also passes on /html/dashboard-help.html or /html/signin.html?next=dashboard.
 await expect(page).toHaveURL(/dashboard/);
+// ✔ Right: exact path when the URL is fixed.
+await expect(page).toHaveURL('/html/dashboard.html');
+// ✔ Right: a regular expression only for a part that changes, e.g. an id.
+// (Made-up URL: our app has no changing URLs so far.)
+await expect(page).toHaveURL(/\/html\/task\.html\?id=\d+$/);
+
+// ✘ Wrong: waitForURL then toHaveURL. The wait adds nothing; toHaveURL already waits.
+await page.waitForURL('/html/dashboard.html');
+await expect(page).toHaveURL('/html/dashboard.html');
+// ✔ Right
+await expect(page).toHaveURL('/html/dashboard.html');
 ```
 
 ### Actions
