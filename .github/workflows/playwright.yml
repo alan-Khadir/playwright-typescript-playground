@@ -1,32 +1,75 @@
+# CI workflow: GitHub runs this file on its own machines. Docs: https://playwright.dev/docs/ci-intro
+# Same checks as before a commit, fastest first: format:check, lint, typecheck, then tests.
+
+# The name shown in the Actions tab and on the PR's Checks list.
 name: Playwright Tests
+
+# WHEN it runs ("triggers").
 on:
+  # A push to main or master. A squash merge is a push to main, so every merge runs it.
   push:
     branches: [main, master]
+  # A pull request INTO main or master. Every new push to the PR's branch runs it again.
+  # A push to a branch with no PR runs nothing.
   pull_request:
     branches: [main, master]
+
+# WHAT it runs. One job, called "test".
 jobs:
   test:
+    # Stop the whole job if it runs longer than 60 minutes (normal run: about 1-2 minutes).
     timeout-minutes: 60
+    # A fresh Linux (Ubuntu) machine from GitHub, thrown away after the run.
     runs-on: ubuntu-latest
+    # The steps run top to bottom. If one fails, the later ones are skipped
+    # (except steps marked `if: ${{ !cancelled() }}`).
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      # Ready-made step ("action"): copies the repo, at this PR's commit, onto the machine.
+      # @v7 = major version 7 of that action.
+      - uses: actions/checkout@v7
+      # Ready-made step: installs Node on the machine.
+      - uses: actions/setup-node@v7
+        # `with:` = the inputs given to the action above.
         with:
-          node-version: lts/*
+          # The newest Node 24.x: the same major version as our machines, not lts/*,
+          # so CI can't silently move to a newer Node than the one we test on.
+          node-version: 24
+      # `name:` = the label shown for this step on the Checks page. `run:` = the command.
       - name: Install dependencies
+        # Installs the exact versions in package-lock.json (never updates them).
         run: npm ci
+      # The three fast checks run BEFORE the browser install: if one fails,
+      # CI stops in seconds instead of after installing Chromium.
+      - name: Check formatting (Prettier)
+        # Fails if any file isn't laid out the Prettier way. Fix locally with: npm run format
+        run: npm run format:check
+      - name: Lint (ESLint)
+        # Fails on any ESLint error or warning, e.g. a missing await.
+        run: npm run lint
+      - name: Type check (tsc)
+        # Fails on any TypeScript type error, e.g. text where a number is expected.
+        run: npm run typecheck
       - name: Install Playwright Browsers
         # Before Week 1 Day 3 (all 3 browsers + their Linux packages). Kept in case we need it,
         # e.g. when Firefox and WebKit come back in Week 9:
         # run: npx playwright install --with-deps
         # Now Chromium only: the one browser in playwright.config.ts. Fewer Linux packages
         # = faster install, and it can't fail on WebKit/Firefox package downloads.
+        # --with-deps = also install the Linux system packages Chromium needs.
         run: npx playwright install --with-deps chromium
       - name: Run Playwright tests
+        # The same command we run locally. Playwright starts the app (webServer in
+        # playwright.config.ts), runs every test, and writes the HTML report to playwright-report/.
         run: npm test
-      - uses: actions/upload-artifact@v4
+      # Ready-made step: saves a folder from the machine so you can download it from the run page.
+      - uses: actions/upload-artifact@v7
+        # Run this step even if an earlier step failed (the report matters most when tests fail).
+        # Skipped only if someone cancels the run. ${{ }} = a GitHub expression.
         if: ${{ !cancelled() }}
         with:
+          # The download's name on the run page (Summary > Artifacts).
           name: playwright-report
+          # Which folder to save.
           path: playwright-report/
+          # GitHub deletes it after 30 days.
           retention-days: 30
