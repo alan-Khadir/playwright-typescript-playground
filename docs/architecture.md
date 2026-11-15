@@ -11,6 +11,7 @@ webapp/               the app under test. Never changed to make a test pass.
 docs/                 setup-guide.md, architecture.md
   decisions/          one file per decision record, e.g. 001-week-1-tooling-and-workflow.md
 tests/
+  fixtures/index.ts   hands each test its page objects by name ({ homePage }); specs import test and expect from here
   specs/<app area>/   the tests and every expect, one folder per screen the tests start on
     sign-in/sign-in.spec.ts
     home/home.spec.ts
@@ -213,6 +214,7 @@ async signIn(email: string, password: string): Promise<void> {}
 ### Page objects
 
 - Page objects hold locators and actions only. Every `expect` lives in the spec.
+- Specs get page objects from fixtures (`async ({ homePage }) => ...`), never with `new`. Every page object has a fixture in `tests/fixtures/index.ts`. See "Fixtures" below.
 - Every user action goes through a page object method, even a single click (`homePage.openSignIn()`). Specs never call `click()` or `fill()` directly.
 - Anything a spec needs to check is a `readonly` Locator property on the page object; the spec asserts on it with a web-first assertion. Specs hold no locators of their own.
 - A page object stores the tab (`private readonly page: Page`) only if a method uses `this.page` later (e.g. `goto()`). Otherwise the constructor takes `page: Page` as a plain input.
@@ -239,6 +241,40 @@ await expect(signInPage.errorMessage).toBeVisible();
 `await` never retries; it only waits for a Promise to finish. The retrying comes from the web-first assertion, and only when `expect` is given a Locator (or the page). Sources: [Assertions](https://playwright.dev/docs/test-assertions), [Best practices: web-first assertions](https://playwright.dev/docs/best-practices#use-web-first-assertions), Martin Fowler's [PageObject](https://martinfowler.com/bliki/PageObject.html) (no assertions in page objects).
 
 Source: [Page object models](https://playwright.dev/docs/pom).
+
+### Fixtures
+
+Every page object is a fixture in `tests/fixtures/index.ts`. A spec asks for what it uses, by name, and Playwright builds it before the test and throws it away after.
+
+```ts
+// ✘ Before (Week 1): every test builds its own page objects.
+import { test, expect } from '@playwright/test';
+import { HomePage } from '../../pages/HomePage';
+
+test('Login link opens the sign-in page', async ({ page }) => {
+  const homePage = new HomePage(page);
+  // ...
+});
+
+// ✔ Now: the test names what it needs; the fixture builds it.
+import { test, expect } from '../../fixtures';
+
+test('Login link opens the sign-in page', async ({
+  page,
+  homePage,
+  signInPage,
+}) => {
+  // ...
+});
+```
+
+- Specs import `test` and `expect` from `../../fixtures`, never from `@playwright/test`.
+- List exactly the names the test body uses. Add `page` only if the test uses it directly (e.g. `expect(page).toHaveURL(...)`).
+- All fixtures in one test share one tab: Playwright builds `page` once per test and every fixture that asks for it gets the same one.
+- A fixture only builds the object (`await use(new HomePage(page))`). Steps such as `goto()` stay in the test, because not every test starts on the same page.
+- Not used: `beforeEach` with `let homePage` (reassignable, built even when unused, not shareable across files); `BaseTest` or `BasePage` classes (inheritance, see Page objects).
+
+Source: [Fixtures](https://playwright.dev/docs/test-fixtures).
 
 ### Naming
 

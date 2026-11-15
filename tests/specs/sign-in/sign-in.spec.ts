@@ -4,16 +4,19 @@
 // Docs: https://playwright.dev/docs/writing-tests
 //       https://playwright.dev/docs/test-assertions
 
-// `test` and `expect` are FUNCTIONS from Playwright. A function is a set of steps you can run,
-// like a method but not inside a class. We RUN them, so they need a normal `import`:
-//   test(...)   -> defines one test
-//   expect(...) -> a check: "this must be true, or the test fails"
-import { test, expect } from '@playwright/test';
-// Our page object. The path starts from THIS file's folder and `..` means "up one folder":
-//   tests/specs/sign-in/  --..-->  tests/specs/  --..-->  tests/  -->  pages/SignInPage
-// (No .ts at the end: TypeScript finds SignInPage.ts by itself.)
-import { SignInPage } from '../../pages/SignInPage';
-import { DashboardPage } from '../../pages/DashboardPage';
+// `test` and `expect` come from OUR fixtures file (tests/fixtures/index.ts), not
+// straight from Playwright:
+//   test(...)   -> defines one test. It's Playwright's test PLUS our page objects,
+//                  so a test can ask for { signInPage } instead of building one.
+//   expect(...) -> Playwright's check, passed through unchanged: "this must be true,
+//                  or the test fails"
+// Both are FUNCTIONS (called on their own, no dot in front). We RUN them, so they
+// need a normal `import`.
+// The path starts from THIS file's folder and `..` means "up one folder":
+//   tests/specs/sign-in/  --..-->  tests/specs/  --..-->  tests/  -->  fixtures/
+// A folder path finds the folder's index.ts by itself (no .ts at the end either).
+// Page objects are no longer imported here: the fixtures file does that.
+import { test, expect } from '../../fixtures';
 
 // test.describe('Sign in', () => { ... }) groups related tests under one name.
 // The HTML report then shows each test as:
@@ -26,30 +29,30 @@ import { DashboardPage } from '../../pages/DashboardPage';
 //   { ... } -> the steps (here: the tests in this group)
 // We hand it to test.describe, and Playwright runs it to find the tests inside.
 test.describe('Sign in', () => {
-  // test('name', async ({ page }) => { ... }) defines ONE test: a name + the steps.
+  // test('name', async ({ ... }) => { ... }) defines ONE test: a name + the steps.
   //
   // The name states the expected result, so a failure reads like a bug report:
   //   ✘ Sign in › valid user reaches the dashboard
   //
-  // `async ({ page }) => { ... }` is the steps, as an arrow function:
+  // `async ({ page, signInPage, dashboardPage }) => { ... }` is the steps, as an
+  // arrow function with no name (we hand it to test(), and Playwright runs it):
   //   - `async`: the steps use `await`, so the function must be async.
-  //   - `({ page })`: the function's input. Playwright passes in a set of ready-made
-  //     things; `{ page }` means "from that set, I want `page`".
-  //     `page` is a brand-new browser tab in a brand-new browser context
-  //     (no cookies or localStorage left over from other tests).
-  //     This is a FIXTURE: something Playwright creates before the test and
-  //     throws away after it. It's why each test can run alone, in any order.
-  test('valid user reaches the dashboard', async ({ page }) => {
-    // `const` = give a value a name, and that name can never be given a new value.
-    // Example of a MISTAKE `npm run typecheck` would catch, if a later line in this test did:
-    //   const signInPage = new SignInPage(page);   // first line: OK
-    //   signInPage = new SignInPage(page);         // later line: give it a new value
-    // `npm run typecheck` reports: Cannot assign to 'signInPage' because it is a constant.
-    // `new SignInPage(page)` = build this test's own SignInPage object, using this test's
-    // tab. This runs the constructor in SignInPage.ts, which sets the five locators.
-    const signInPage = new SignInPage(page);
-    const dashboardPage = new DashboardPage(page);
-
+  //   - `({ ... })`: the function's input. Playwright passes in an object of
+  //     ready-made things (FIXTURES: built before the test, thrown away after);
+  //     the braces pick the ones this test uses, BY NAME:
+  //       page          -> Playwright's: a brand-new tab in a brand-new browser
+  //                        context (no cookies or localStorage from other tests)
+  //       signInPage    -> ours (tests/fixtures/index.ts): a SignInPage built
+  //       dashboardPage    with this test's tab, and a DashboardPage likewise
+  //     All three share ONE tab: Playwright builds `page` once per test and every
+  //     fixture that asks for it gets the same one.
+  //   - List exactly the names the steps use: this test needs `page` for
+  //     expect(page); the next test only uses signInPage, so it lists only that.
+  test('valid user reaches the dashboard', async ({
+    page,
+    signInPage,
+    dashboardPage,
+  }) => {
     // The user's steps, in order. Each method returns a Promise, so each is awaited:
     // finish this step before starting the next.
     await signInPage.goto(); // open /html/signin.html
@@ -74,9 +77,7 @@ test.describe('Sign in', () => {
     await expect(dashboardPage.heading).toBeVisible();
   });
 
-  test('wrong password shows the error', async ({ page }) => {
-    const signInPage = new SignInPage(page);
-
+  test('wrong password shows the error', async ({ signInPage }) => {
     await signInPage.goto();
     // A wrong password, so the app should refuse to sign in.
     // signIn() is reused: the values come from the test, not the page object.

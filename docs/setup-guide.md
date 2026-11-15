@@ -913,6 +913,34 @@ npx playwright test sign-in --reporter=list   # 4. only files whose path contain
 
 Expected for step 4: `✓ ... tests\specs\sign-in\sign-in.spec.ts:40:3 › Sign in › valid user reaches the dashboard` and `1 passed`.
 
+## Step 12. Fixtures for page objects (Week 2 Day 1)
+
+**Where:** VS Code terminal, repo root `PS C:\git-personal\playwright-typescript-playground>`.
+
+```powershell
+git switch main                         # go to the main branch
+git pull                                # bring down the latest main from GitHub
+git switch -c feat/fixtures-and-navbar  # -c = create today's branch and switch to it
+```
+
+No new package or command: fixtures are part of `@playwright/test`.
+
+| File                                                                   | What it is                                                                                                                                                       |
+| ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tests/fixtures/index.ts`                                              | `test.extend<Fixtures>` with one fixture per page object (`homePage`, `signInPage`, `taskBoardPage`, `createAccountPage`, `dashboardPage`); re-exports `expect`. |
+| `tests/specs/home/home.spec.ts`, `tests/specs/sign-in/sign-in.spec.ts` | Import `test` and `expect` from `../../fixtures` and ask for page objects by name; no `new` in any spec.                                                         |
+
+Rules: `docs/architecture.md`, "Fixtures".
+
+**Check (fastest first):**
+
+```powershell
+npm run format:check   # 1. Prettier: "All matched files use Prettier code style!"
+npm run lint           # 2. ESLint: no output = no problems
+npm run typecheck      # 3. tsc: no output = no type errors
+npm test               # 4. 5 passed
+```
+
 ## Run, debug and report commands
 
 **Where:** VS Code terminal, in the repo root.
@@ -953,8 +981,8 @@ git switch -c feat/sign-in-tests             # create the branch and move onto i
 
 # 2. Work: write tests/specs/sign-in/sign-in.spec.ts, save often
 
-# 3. Checks: the same four CI runs
-npm run format                               # fix layout
+# 3. Checks: the same four CI runs, fastest first
+npm run format:check                         # layout OK? (if not: npm run format, then check again)
 npm run lint                                 # bad practice? must print no problems
 npm run typecheck                            # wrong types? must print no errors
 npm test                                     # all tests pass?
@@ -994,16 +1022,16 @@ git switch -c TYPE/short-description
 
 ### 2. Run the checks, then stage and commit
 
-Before every commit, run the same four checks CI runs. Fix anything they report before committing.
+Before every commit, run the same four checks CI runs, fastest first. Fix anything they report before committing.
 
 ```powershell
-npm run format
+npm run format:check
 npm run lint
 npm run typecheck
 npm test
 ```
 
-- `npm run format`: Prettier fixes the layout of every file (format-on-save usually already has).
+- `npm run format:check`: Prettier reports any file whose layout is wrong, without changing it (the same check CI runs). If it fails, run `npm run format` (fixes every file), then check again.
 - `npm run lint`: ESLint; must print no problems (warnings fail too).
 - `npm run typecheck`: tsc; must print no errors.
 - `npm test`: every test passes.
