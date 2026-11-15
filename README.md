@@ -130,14 +130,14 @@ Every text file is stored with LF line endings, whatever machine it was saved on
 
 ### Pull request + green Actions
 
-We never push to `main` directly. Every change goes on a branch, such as `feat/sign-in-tests`, then through a pull request. It is squash-merged only when GitHub Actions is green.
+We never push to `main` directly. Every change goes on a branch, such as `feat/sign-in-tests`, then through a pull request. It is squash-merged only when GitHub Actions is green. Step by step, with every command: [Git workflow](docs/setup-guide.md#git-workflow-every-change).
 
 ## Documentation
 
-| Document                                     | What's in it                                                               |
-| -------------------------------------------- | -------------------------------------------------------------------------- |
-| [docs/setup-guide.md](docs/setup-guide.md)   | Every tool, install command and config file; Git workflow; Troubleshooting |
-| [docs/architecture.md](docs/architecture.md) | Folder structure, the rules every test follows, naming                     |
-| [docs/decisions/](docs/decisions/)           | Decision records: what we chose, why, and what we rejected                 |
+| Document                                     | What's in it                                                                                                                |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| [docs/setup-guide.md](docs/setup-guide.md)   | Every tool, install command and config file; [Git workflow](docs/setup-guide.md#git-workflow-every-change); Troubleshooting |
+| [docs/architecture.md](docs/architecture.md) | Folder structure, the rules every test follows, naming                                                                      |
+| [docs/decisions/](docs/decisions/)           | Decision records: what we chose, why, and what we rejected                                                                  |
 
 App bugs are raised as [GitHub Issues](https://github.com/alan-Khadir/playwright-typescript-playground/issues) with the `bug` label.

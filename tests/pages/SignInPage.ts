@@ -35,11 +35,13 @@
 import type { Locator, Page } from '@playwright/test';
 
 // WHAT IS A CLASS?
-// A class is a blueprint, like a test-case TEMPLATE. Each test fills in its own copy:
-//   const signInPage = new SignInPage(page);   -> `new` builds one copy (an "object")
+// A class is a blueprint, like a test-case TEMPLATE. Each test gets its own copy:
+//   new SignInPage(page)   -> `new` builds one copy (an "object")
+// Our fixture does this for every test that asks for { signInPage }
+// (tests/fixtures/index.ts), so specs never write `new` themselves.
 // Two tests = two separate copies, so they never share anything.
-// `export` = other files may use this class. Without it, the spec's
-//   import { SignInPage } from '../../pages/SignInPage';  -> error: not exported
+// `export` = other files may use this class. Without it, the fixtures file's
+//   import { SignInPage } from '../pages/SignInPage';  -> error: not exported
 export class SignInPage {
   // PROPERTIES = named values stored on each copy. This class has five:
   // emailInput, passwordInput, signInButton, errorMessage and heading. Each property holds a Locator.
@@ -67,8 +69,9 @@ export class SignInPage {
   readonly heading: Locator;
 
   // WHAT IS A CONSTRUCTOR?
-  // The setup code that runs once, at the moment a test writes `new SignInPage(page)`.
-  // The test hands in its browser tab; here it arrives as `page`.
+  // The setup code that runs once, at the moment `new SignInPage(page)` runs
+  // (in the signInPage fixture, before a test that asks for it).
+  // The fixture hands in the test's browser tab; here it arrives as `page`.
   //
   // `private readonly page: Page` is a shortcut. It means all of this:
   //   - accept a browser tab as input,
