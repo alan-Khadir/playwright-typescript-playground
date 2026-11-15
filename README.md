@@ -47,97 +47,26 @@ GitHub Actions runs the same four checks, in the same order, on every pull reque
 
 ## Guardrails
 
-Checks that stop bad code reaching `main`. Each one catches a different kind of problem, so they don't overlap.
+Checks that stop bad code reaching `main`. Each catches a different kind of problem, so they don't overlap. Why each one was chosen: [decision record 001](docs/decisions/001-week-1-tooling-and-workflow.md). Wrong/right examples for each rule: [docs/architecture.md](docs/architecture.md).
 
-| Guardrail                         | What it catches                                         | How it runs                      |
-| --------------------------------- | ------------------------------------------------------- | -------------------------------- |
-| TypeScript, strict (`tsc`)        | Wrong types                                             | `npm run typecheck`              |
-| ESLint (typescript-eslint)        | Risky code that is still valid: bad habits, likely bugs | `npm run lint`                   |
-| ESLint (eslint-plugin-playwright) | Playwright misuse in tests                              | `npm run lint`                   |
-| Prettier                          | Layout only: spaces, quotes, line breaks                | `npm run format:check`           |
-| `.gitattributes`                  | Windows (CRLF) vs Linux (LF) line endings               | Automatic on `git add`           |
-| Pinned versions + lock file       | "Works on my machine" from different tool versions      | `npm ci` installs exact versions |
-| Pull request + green Actions      | Untested code merged into `main`                        | GitHub                           |
-
-### TypeScript, strict
-
-Checks every value has the right type before a test runs. Settings: `tsconfig.json`.
-
-```ts
-// ✘ Wrong: text where a number is expected.
-// npm run typecheck reports: Type 'string' is not assignable to type 'number'.
-const timeout: number = '5000';
-// ✔ Right
-const timeout: number = 5000;
-```
-
-### ESLint (typescript-eslint)
-
-Finds code that compiles but is probably a bug. Type-aware rules know that `page.goto()` returns a Promise, so they spot a missing `await`. Settings: `eslint.config.mjs`.
-
-```ts
-// ✘ Wrong: not awaited, so the next line can run before the page loads (a flaky test).
-// ESLint: @typescript-eslint/no-floating-promises
-page.goto('/html/signin.html');
-// ✔ Right
-await page.goto('/html/signin.html');
-```
-
-### ESLint (eslint-plugin-playwright)
-
-Playwright-specific rules, for files in `tests/` only.
-
-```ts
-// ✘ Wrong: a fixed sleep. Too slow when the app is fast, too short when it's slow.
-// ESLint: playwright/no-wait-for-timeout
-await page.waitForTimeout(3000);
-// ✔ Right: a web-first assertion keeps retrying until it passes (up to 5 seconds).
-await expect(
-  page.getByRole('heading', { name: 'Choose a Topic' }),
-).toBeVisible();
-```
-
-### Prettier
-
-Formats layout so every file looks the same and reviews show only real changes. Settings: `.prettierrc.json` (single quotes) and `.prettierignore` (files to skip). ESLint's own layout rules are switched off (`eslint-config-prettier`), so the two never argue.
-
-<!-- prettier-ignore -->
-```ts
-// ✘ Wrong: double quotes, missing spaces. `npm run format:check` reports it.
-const email="user@test.com"
-// ✔ Right: what `npm run format` turns it into.
-const email = 'user@test.com';
-```
-
-### Line endings (`.gitattributes`)
-
-Every text file is stored with LF line endings, whatever machine it was saved on.
-
-- ✘ Without it: a commit from Windows can show every line of a file as changed, and Git warns "LF will be replaced by CRLF".
-- ✔ With it: diffs show only the lines you really changed, and Windows and CI (Linux) see identical files.
-
-### Pinned versions and the lock file
-
-`package.json` says which versions are allowed. `package-lock.json` records the exact versions installed. CI runs `npm ci`, which installs exactly what the lock file says.
-
-```jsonc
-// ✘ Wrong: "^" allows any 6.x, e.g. 6.1, but typescript-eslint 8 only supports TypeScript below 6.1,
-// so a fresh install could pick a version our linter can't use.
-"typescript": "^6.0.3"
-// ✔ Right: "~" allows 6.0.x patch fixes only. Why: docs/decisions/001-week-1-tooling-and-workflow.md
-"typescript": "~6.0"
-```
-
-### Pull request + green Actions
-
-We never push to `main` directly. Every change goes on a branch, such as `feat/sign-in-tests`, then through a pull request. It is squash-merged only when GitHub Actions is green. Step by step, with every command: [Git workflow](docs/setup-guide.md#git-workflow-every-change).
+| Guardrail                         | What it catches                                        | How it runs                      | Settings                                                      |
+| --------------------------------- | ------------------------------------------------------ | -------------------------------- | ------------------------------------------------------------- |
+| TypeScript, strict (`tsc`)        | Wrong types                                            | `npm run typecheck`              | `tsconfig.json`                                               |
+| ESLint (typescript-eslint)        | Risky code that is still valid, e.g. a missing `await` | `npm run lint`                   | `eslint.config.mjs`                                           |
+| ESLint (eslint-plugin-playwright) | Playwright misuse in tests, e.g. `waitForTimeout`      | `npm run lint`                   | `eslint.config.mjs`                                           |
+| Prettier                          | Layout only: spaces, quotes, line breaks               | `npm run format:check`           | `.prettierrc.json`, `.prettierignore`                         |
+| `.gitattributes`                  | Windows (CRLF) vs Linux (LF) line endings              | Automatic on `git add`           | `.gitattributes`                                              |
+| Pinned versions + lock file       | "Works on my machine" from different tool versions     | `npm ci` installs exact versions | `package.json`, `package-lock.json`                           |
+| Pull request + green Actions      | Untested code merged into `main`                       | GitHub                           | [Git workflow](docs/setup-guide.md#git-workflow-every-change) |
 
 ## Documentation
 
-| Document                                     | What's in it                                                                                                                |
-| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| [docs/setup-guide.md](docs/setup-guide.md)   | Every tool, install command and config file; [Git workflow](docs/setup-guide.md#git-workflow-every-change); Troubleshooting |
-| [docs/architecture.md](docs/architecture.md) | Folder structure, the rules every test follows, naming                                                                      |
-| [docs/decisions/](docs/decisions/)           | Decision records: what we chose, why, and what we rejected                                                                  |
+| Document                                                       | What's in it                                                                                                                |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| [docs/setup-guide.md](docs/setup-guide.md)                     | Every tool, install command and config file; [Git workflow](docs/setup-guide.md#git-workflow-every-change); Troubleshooting |
+| [docs/architecture.md](docs/architecture.md)                   | Folder structure, the rules every test follows, naming                                                                      |
+| [docs/decisions/](docs/decisions/)                             | Decision records: what we chose, why, and what we rejected                                                                  |
+| [docs/learning/concepts.md](docs/learning/concepts.md)         | How each TypeScript and Playwright concept works, with C#/Selenium comparisons                                              |
+| [docs/learning/walkthroughs.md](docs/learning/walkthroughs.md) | Our page objects, specs and fixtures explained line by line                                                                 |
 
 App bugs are raised as [GitHub Issues](https://github.com/alan-Khadir/playwright-typescript-playground/issues) with the `bug` label.
