@@ -11,6 +11,7 @@ This is the single record of how this framework is set up. It is written so that
 - Run commands **one at a time**: paste one line, press Enter, wait for the prompt (`PS C:\...>`) to come back, then run the next.
 - Each step ends with **Check**: what you should see. If you don't see it, stop and fix it (see Troubleshooting) before the next step.
 - A new PowerShell window opens in `C:\Windows\System32`. Never run project commands there.
+- This guide says what to run and what to expect. Why each tool and setting works is explained in [learning/concepts.md](learning/concepts.md).
 
 ## Toolkit
 

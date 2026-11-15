@@ -1,6 +1,6 @@
 # Architecture
 
-How this framework is organised, and the rules every test follows. Setup and commands: [setup-guide.md](setup-guide.md). Checks that enforce the rules: [README Guardrails](../README.md#guardrails).
+How this framework is organised, and the rules every test follows. This file says WHAT we do; why it works is explained in [learning/concepts.md](learning/concepts.md), and our files are explained line by line in [learning/walkthroughs.md](learning/walkthroughs.md). Setup and commands: [setup-guide.md](setup-guide.md). Checks that enforce the rules: [README Guardrails](../README.md#guardrails).
 
 ## Folder structure
 
@@ -9,6 +9,7 @@ Folders are created when the first file needs them, so this grows week by week.
 ```
 webapp/               the app under test. Never changed to make a test pass.
 docs/                 setup-guide.md, architecture.md
+  learning/           concepts.md (how things work), walkthroughs.md (our files, line by line)
   decisions/          one file per decision record, e.g. 001-week-1-tooling-and-workflow.md
 tests/
   fixtures/index.ts   hands each test its page objects by name ({ homePage }); specs import test and expect from here
@@ -41,26 +42,7 @@ page.getByLabel('Email');
 - Form fields: `getByLabel`, as the Locators page recommends for form controls. It reads the same for every field, and it fails if the label is missing or no longer linked to the field.
 - Test IDs are stable but not user-facing: they still pass if the label is missing. Use them only when there is no stable text or role.
 
-#### Which elements `getByRole` can find
-
-`getByRole` searches the role the browser gives each element, not the HTML tag. Full mapping: W3C [ARIA in HTML](https://www.w3.org/TR/html-aria/). Check any element in Chrome DevTools → Elements → **Accessibility** tab (Role, Name). When the W3C table and the browser disagree, trust Playwright's page snapshot (in `test-results/<test>/error-context.md` after a failure).
-
-| HTML                                            | Role                              | Locator to use                                       |
-| ----------------------------------------------- | --------------------------------- | ---------------------------------------------------- |
-| `button`, `input type="submit"` / `"button"`    | button                            | `getByRole('button', { name: 'Sign In' })`           |
-| `a` with `href`                                 | link                              | `getByRole('link', { name: 'Login' })`               |
-| `h1` to `h6`                                    | heading                           | `getByRole('heading', { name: 'Choose a Topic' })`   |
-| `input type="text"` / `"email"`, `textarea`     | textbox                           | `getByLabel('Email')` (form fields: always by label) |
-| `input type="password"`                         | textbox in Playwright (W3C: none) | `getByLabel('Password')`                             |
-| `input type="checkbox"` / `"radio"` / `"range"` | checkbox / radio / slider         | `getByRole(...)` or `getByLabel(...)`                |
-| `select`                                        | combobox                          | `getByLabel(...)`, act with `selectOption()`         |
-| `img` with `alt`                                | img                               | `getByRole('img', { name })` or `getByAltText`       |
-| `main`, `nav`                                   | main, navigation                  | for scoping: `getByRole('main').getBy...`            |
-| `form` with no name                             | none in Playwright                | `getByRole('form')` finds it only with `aria-label`  |
-| `div`, `span`, `a` without `href`               | generic (no useful role)          | `getByText(...)`                                     |
-
-- `role="..."` on an element overrides the tag (e.g. `div role="alert"` is an alert).
-- `aria-label` gives a name, not a role. `aria-live` gives neither: the sign-in error `div` has `aria-live="polite"` and is still generic, so we use `getByText`.
+- `getByRole` searches the role the browser gives each element, not the HTML tag (e.g. an email input is a `textbox`; a `div` is `generic`, so use `getByText`). Full role table and how to find roles on any page: [concepts: ARIA and roles](learning/concepts.md#aria-roles-and-the-accessibility-tree-week-1-day-3). When the W3C table and the browser disagree, trust Playwright's page snapshot.
 
 ### Strict mode: one locator, one element
 
@@ -136,40 +118,14 @@ Source: [toHaveURL](https://playwright.dev/docs/api/class-pageassertions#page-as
 - The URL alone isn't proof: a blank or broken page can have the right address. Follow it with a check the user would see, e.g. the page heading.
 
 ```ts
+// ✘ Wrong: page.url() reads the address ONCE (a plain string). No retry: fails if the redirect is slow.
+expect(page.url()).toBe('http://localhost:3000/html/dashboard.html');
 // ✔ Right: our pattern. Retries, exact path, then what the user sees.
 await expect(page).toHaveURL('/html/dashboard.html');
 await expect(dashboardPage.heading).toBeVisible();
-
-// ✘ Wrong: page.url() reads the address ONCE and returns a plain string. No retry: fails if the redirect is slow.
-expect(page.url()).toBe('http://localhost:3000/html/dashboard.html');
-// ✔ Right
-await expect(page).toHaveURL('/html/dashboard.html');
-
-// ✘ Wrong: page.url without () is the method itself, and toHaveURL only works on a Page.
-// npm run typecheck flags it.
-await expect(page.url).toHaveURL('/html/dashboard.html');
-// ✔ Right
-await expect(page).toHaveURL('/html/dashboard.html');
-
-// ✘ Wrong: the full address hard-coded. Breaks when baseURL changes (another port, a test server).
-await expect(page).toHaveURL('http://localhost:3000/html/dashboard.html');
-// ✔ Right: path only; baseURL is added for you.
-await expect(page).toHaveURL('/html/dashboard.html');
-
-// ✘ Wrong: too loose. Also passes on /html/dashboard-help.html or /html/signin.html?next=dashboard.
-await expect(page).toHaveURL(/dashboard/);
-// ✔ Right: exact path when the URL is fixed.
-await expect(page).toHaveURL('/html/dashboard.html');
-// ✔ Right: a regular expression only for a part that changes, e.g. an id.
-// (Made-up URL: our app has no changing URLs so far.)
-await expect(page).toHaveURL(/\/html\/task\.html\?id=\d+$/);
-
-// ✘ Wrong: waitForURL then toHaveURL. The wait adds nothing; toHaveURL already waits.
-await page.waitForURL('/html/dashboard.html');
-await expect(page).toHaveURL('/html/dashboard.html');
-// ✔ Right
-await expect(page).toHaveURL('/html/dashboard.html');
 ```
+
+More wrong/right pairs (hard-coded full URL, loose regex, `waitForURL` before `toHaveURL`): [concepts: Assertions with expect](learning/concepts.md#assertions-with-expect).
 
 ### Actions
 
@@ -222,25 +178,9 @@ async signIn(email: string, password: string): Promise<void> {}
 - No wrappers around Playwright's own API: no GENERIC helpers such as `clickElement(locator)` or custom wait, retry or log functions. A page-specific user action like `openSignIn()` is not a wrapper.
 - At most three hops from a test to a locator: spec → page object → Playwright.
 
-How a spec checks something the page object finds (example: the sign-in error):
+How a spec checks something the page object finds: a `readonly` Locator property on the page object, and a web-first assertion in the spec (`await expect(signInPage.errorMessage).toBeVisible()`). Not a method that returns the text (no retry), not an `expect` inside the page object (hides the check). The 4 options compared: [concepts](learning/concepts.md#how-a-spec-checks-something-that-a-page-object-finds-4-options-week-1-day-4).
 
-| Option                                                                                               | Verdict      | Why                                                                                                                               |
-| ---------------------------------------------------------------------------------------------------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------- |
-| 1. Method returns the text; spec does `expect(text).toBe(...)`                                       | ✘ Rejected   | Reads the text once, no retry: flaky.                                                                                             |
-| 2. `expect` inside the page object (`await signInPage.expectErrorVisible()`)                         | ✘ Not here   | Retries, but hides the check from the spec and breaks "every expect in the spec".                                                 |
-| 3. Method returns the Locator (`getErrorMessage(): Locator`)                                         | ✘ Unneeded   | Same as 4 with an extra method that does nothing.                                                                                 |
-| 4. `readonly errorMessage: Locator`; spec does `await expect(signInPage.errorMessage).toBeVisible()` | ✔ We do this | Retries (web-first), locator in one place, check visible in the spec. Same as the [POM](https://playwright.dev/docs/pom) example. |
-
-```ts
-// ✘ Wrong: reads the text once. If the error isn't shown yet, '' !== expected -> fails, no retry.
-expect(await signInPage.getErrorText()).toBe('Invalid email or password.');
-// ✔ Right: expect gets the Locator, so toBeVisible() re-checks for up to 5 seconds.
-await expect(signInPage.errorMessage).toBeVisible();
-```
-
-`await` never retries; it only waits for a Promise to finish. The retrying comes from the web-first assertion, and only when `expect` is given a Locator (or the page). Sources: [Assertions](https://playwright.dev/docs/test-assertions), [Best practices: web-first assertions](https://playwright.dev/docs/best-practices#use-web-first-assertions), Martin Fowler's [PageObject](https://martinfowler.com/bliki/PageObject.html) (no assertions in page objects).
-
-Source: [Page object models](https://playwright.dev/docs/pom).
+Source: [Page object models](https://playwright.dev/docs/pom), Martin Fowler's [PageObject](https://martinfowler.com/bliki/PageObject.html) (no assertions in page objects).
 
 ### Fixtures
 
