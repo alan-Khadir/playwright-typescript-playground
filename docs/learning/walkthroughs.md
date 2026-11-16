@@ -11,6 +11,7 @@ Contents:
 - [SignInPage](#signinpage) (`tests/pages/SignInPage.ts`)
 - [Sign-in spec](#sign-in-spec) (`tests/specs/sign-in/sign-in.spec.ts`)
 - [Fixtures](#fixtures) (`tests/fixtures/index.ts`)
+- [NavBar and the dark mode test](#navbar-and-the-dark-mode-test) (`tests/components/NavBar.ts`, `tests/pages/HomePage.ts`, `tests/specs/home/home.spec.ts`) (Week 2 Day 1)
 
 ---
 
@@ -330,3 +331,90 @@ export { expect } from '@playwright/test';
 ```
 
 - [JS] **re-export**: import and export again in one line, so specs get `test` AND `expect` from `'../../fixtures'`.
+
+---
+
+## NavBar and the dark mode test
+
+Week 2 Day 1. Concepts: [Components and composition](concepts.md#components-and-composition-week-2-day-1), [Checking a class, and the one CSS locator](concepts.md#checking-a-class-and-the-one-css-locator-week-2-day-1).
+
+### NavBar: the class and its constructor
+
+```ts
+export class NavBar {
+  private readonly mainNavigation: Locator;
+  readonly loginLink: Locator;
+  // ...signUpLink, taskBoardLink
+  readonly darkModeButton: Locator;
+
+  constructor(page: Page) {
+    this.mainNavigation = page.getByRole('navigation', { name: 'Main navigation' });
+    this.loginLink = this.mainNavigation.getByRole('link', { name: 'Login' });
+    // ...
+    this.darkModeButton = this.mainNavigation.getByRole('button', { name: 'Toggle dark mode' });
+  }
+```
+
+- `NavBar` [OURS]: a **component**, not a page object: a part that sits inside many screens. No `Page` in the name, because you can't `goto()` it. Lives in `tests/components/`.
+- `constructor(page: Page)` [JS/TS]: `page` is a plain input, NOT stored (no `private readonly`), because no NavBar method uses `this.page`; it's only needed here to build the locators.
+- `private readonly mainNavigation` [TS]: specs never use the nav itself, only the links and button inside it.
+- `this.mainNavigation.getByRole(...)` [PW]: **chaining**: search only inside the Main navigation, so another "Login" link elsewhere can't cause a strict mode error.
+- `getByRole('button', { name: 'Toggle dark mode' })` [PW]: role `button`; the name comes from `aria-label="Toggle dark mode"` (the 🌙 inside is ignored when aria-label is set). Found in Chrome: Inspect → Accessibility → Computed properties.
+
+### NavBar: the actions
+
+```ts
+  async openSignIn(): Promise<void> {
+    await this.loginLink.click();
+  }
+  // ...openCreateAccount(), openTaskBoard()
+  async toggleDarkMode(): Promise<void> {
+    await this.darkModeButton.click();
+  }
+```
+
+- Same pattern as before: one method per user action, named for the user's goal (`toggleDarkMode`, not `clickDarkModeButton`). camelCase: small first letter.
+
+### HomePage: composition
+
+```ts
+export class HomePage {
+  readonly navBar: NavBar;
+  readonly htmlElement: Locator;
+
+  constructor(private readonly page: Page) {
+    this.navBar = new NavBar(page);
+    this.htmlElement = page.locator('html');
+  }
+```
+
+- `readonly navBar: NavBar` [TS]: HomePage HAS a NavBar (**composition**), instead of inheriting from a base class.
+- `this.navBar = new NavBar(page)` [JS]: HomePage builds its own NavBar with the same tab. It is NOT passed in as a second constructor input, so the fixture stays `new HomePage(page)`.
+  - ✘ `constructor(private readonly page: Page, navBar: NavBar)` → fixture must become `new HomePage(page, new NavBar(page))`
+  - ✔ `constructor(private readonly page: Page) { this.navBar = new NavBar(page); }`
+- `page.locator('html')` [PW]: the page's root element by a CSS selector (tag name). Our one CSS locator: `<html>` has no role, label or text, so no `getBy...` can find it.
+- `private readonly page` is still stored, because `goto()` uses `this.page`.
+
+### The dark mode test
+
+```ts
+test.describe('Dark mode', () => {
+  test('Toggle dark mode button switches the page to dark mode', async ({
+    homePage,
+  }) => {
+    await homePage.goto();
+
+    await expect(homePage.htmlElement).not.toHaveClass('dark-mode');
+
+    await homePage.navBar.toggleDarkMode();
+
+    await expect(homePage.htmlElement).toHaveClass('dark-mode');
+  });
+});
+```
+
+- Its own `test.describe('Dark mode')` group in `home.spec.ts`: it starts on home but isn't navigation.
+- `async ({ homePage })`: only `homePage`, because no line uses `page` directly.
+- `.not.toHaveClass('dark-mode')` [PW]: start state. Proves the click is what adds the class: if the page started dark (leftover localStorage) and the button did nothing, the last check alone would still pass.
+- `homePage.navBar.toggleDarkMode()`: spec → page object → component → Playwright (three hops at most).
+- `.toHaveClass('dark-mode')` [PW]: web-first, retries up to 5 s. A string must match the WHOLE class attribute; `<html>` only gets `dark-mode`, so that's fine. If the app ever adds more classes, use `toContainClass('dark-mode')`.

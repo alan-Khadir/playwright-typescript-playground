@@ -942,6 +942,37 @@ npm run typecheck      # 3. tsc: no output = no type errors
 npm test               # 4. 5 passed
 ```
 
+## Step 13. NavBar component and dark mode test (Week 2 Day 1, part 2)
+
+**Where:** VS Code terminal, repo root `PS C:\git-personal\playwright-typescript-playground>`.
+
+```powershell
+git switch main                            # go to the main branch
+git pull                                   # bring down the latest main from GitHub
+git switch -c feat/navbar-and-dark-mode    # -c = create today's branch and switch to it
+```
+
+No new package or command.
+
+| File                            | What it is                                                                                                                                                                                                                                              |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tests/components/NavBar.ts`    | Component for the Main navigation: `loginLink`, `signUpLink`, `taskBoardLink`, `darkModeButton` (`getByRole('button', { name: 'Toggle dark mode' })`) and their actions (`openSignIn()`, `openCreateAccount()`, `openTaskBoard()`, `toggleDarkMode()`). |
+| `tests/pages/HomePage.ts`       | Now only `goto()`, `navBar` (built with `new NavBar(page)`) and `htmlElement` (`page.locator('html')`, the page root).                                                                                                                                  |
+| `tests/specs/home/home.spec.ts` | Navigation tests call `homePage.navBar.open…()`. New group "Dark mode": not dark → `toggleDarkMode()` → `toHaveClass('dark-mode')` on `htmlElement`.                                                                                                    |
+
+Rules: `docs/architecture.md`, "Page objects" (composition), "Locators" (the CSS exception) and "Naming" (components).
+
+To find a role and name yourself: start the app (`npx serve webapp --listen 3000`), right-click the element in Chrome → Inspect → Accessibility tab → **Role** and **Name** under Computed properties. Turn on **Show accessibility tree** to see the whole page as roles; turn it off to go back to HTML.
+
+**Check (fastest first):**
+
+```powershell
+npm run format:check   # 1. Prettier: "All matched files use Prettier code style!"
+npm run lint           # 2. ESLint: no output = no problems
+npm run typecheck      # 3. tsc: no output = no type errors
+npm test               # 4. 6 passed
+```
+
 ## Run, debug and report commands
 
 **Where:** VS Code terminal, in the repo root.

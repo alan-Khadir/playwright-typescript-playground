@@ -12,6 +12,8 @@ docs/                 setup-guide.md, architecture.md
   learning/           concepts.md (how things work), walkthroughs.md (our files, line by line)
   decisions/          one file per decision record, e.g. 001-week-1-tooling-and-workflow.md
 tests/
+  components/         parts used on many pages, included by page objects as a property (composition)
+    NavBar.ts         the Main navigation: its links, the dark mode button, and their actions
   fixtures/index.ts   hands each test its page objects by name ({ homePage }); specs import test and expect from here
   specs/<app area>/   the tests and every expect, one folder per screen the tests start on
     sign-in/sign-in.spec.ts
@@ -20,7 +22,7 @@ tests/
     SignInPage.ts  HomePage.ts  DashboardPage.ts  CreateAccountPage.ts  TaskBoardPage.ts
 ```
 
-A page object is created the first time a test touches that screen, with only what that test uses (e.g. `CreateAccountPage` has just `heading` until Week 3). `tests/components/` is added when a part of the page (e.g. the Main navigation) is used by page objects for 2+ screens.
+A page object is created the first time a test touches that screen, with only what that test uses (e.g. `CreateAccountPage` has just `heading` until Week 3). A component (`tests/components/`) is a part that appears on 2+ screens. `NavBar` was added in Week 2 Day 1: the Main navigation is on every page, and the plan asks for it then. Today only `HomePage` includes it; other page objects add `readonly navBar` when a test of theirs needs the nav.
 
 ## Rules we follow
 
@@ -40,6 +42,7 @@ page.getByLabel('Email');
 
 - `getByRole` for things you interact with (buttons, links, inputs); `getByText` for plain text (div, span, p).
 - Form fields: `getByLabel`, as the Locators page recommends for form controls. It reads the same for every field, and it fails if the label is missing or no longer linked to the field.
+- CSS only when no user-facing locator can exist. Our one case: the page's root element, `page.locator('html')` (`HomePage.htmlElement`), which has no role, label or text. ✘ `page.locator('.primary-nav button')` (a role and name exist) / ✔ `page.locator('html')`. Source: [Locators: CSS or XPath](https://playwright.dev/docs/locators#locate-by-css-or-xpath).
 - Test IDs are stable but not user-facing: they still pass if the label is missing. Use them only when there is no stable text or role.
 
 - `getByRole` searches the role the browser gives each element, not the HTML tag (e.g. an email input is a `textbox`; a `div` is `generic`, so use `getByText`). Full role table and how to find roles on any page: [concepts: ARIA and roles](learning/concepts.md#aria-roles-and-the-accessibility-tree-week-1-day-3). When the W3C table and the browser disagree, trust Playwright's page snapshot.
@@ -171,12 +174,18 @@ async signIn(email: string, password: string): Promise<void> {}
 
 - Page objects hold locators and actions only. Every `expect` lives in the spec.
 - Specs get page objects from fixtures (`async ({ homePage }) => ...`), never with `new`. Every page object has a fixture in `tests/fixtures/index.ts`. See "Fixtures" below.
-- Every user action goes through a page object method, even a single click (`homePage.openSignIn()`). Specs never call `click()` or `fill()` directly.
+- Every user action goes through a page object method, even a single click (`homePage.navBar.openSignIn()`). Specs never call `click()` or `fill()` directly.
 - Anything a spec needs to check is a `readonly` Locator property on the page object; the spec asserts on it with a web-first assertion. Specs hold no locators of their own.
 - A page object stores the tab (`private readonly page: Page`) only if a method uses `this.page` later (e.g. `goto()`). Otherwise the constructor takes `page: Page` as a plain input.
-- Composition over inheritance: no `BasePage` or `BaseTest`.
+- Composition over inheritance: no `BasePage` or `BaseTest`. A part shared by many pages is a component that the page object builds in its own constructor and exposes as a property:
+  ```ts
+  // ✘ class HomePage extends BasePage   (inheritance: every page gets everything)
+  // ✔ HomePage has a NavBar             (composition: only the parts it really has)
+  this.navBar = new NavBar(page); // in HomePage's constructor; spec: homePage.navBar.openSignIn()
+  ```
+  The page object builds the component itself (not passed in as a constructor input), so the fixture stays `new HomePage(page)`.
 - No wrappers around Playwright's own API: no GENERIC helpers such as `clickElement(locator)` or custom wait, retry or log functions. A page-specific user action like `openSignIn()` is not a wrapper.
-- At most three hops from a test to a locator: spec → page object → Playwright.
+- At most three hops from a test to a locator: spec → page object (→ component) → Playwright, e.g. `homePage.navBar.darkModeButton`.
 
 How a spec checks something the page object finds: a `readonly` Locator property on the page object, and a web-first assertion in the spec (`await expect(signInPage.errorMessage).toBeVisible()`). Not a method that returns the text (no retry), not an `expect` inside the page object (hides the check). The 4 options compared: [concepts](learning/concepts.md#how-a-spec-checks-something-that-a-page-object-finds-4-options-week-1-day-4).
 
@@ -222,9 +231,11 @@ Source: [Fixtures](https://playwright.dev/docs/test-fixtures).
 | ---------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------- |
 | Open this page directly by its URL | `goto()` (one word, like Playwright's `page.goto()`)                  | `homePage.goto()`, `signInPage.goto()`                                    |
 | Reach another page through the UI  | `open` + destination page object name without `Page`                  | `openSignIn()` → `SignInPage`, `openCreateAccount()`, `openTaskBoard()`   |
-| Any other user action              | the user's verb                                                       | `signIn(email, password)`                                                 |
-| Locator properties                 | what it is + kind of element; links use their text                    | `emailInput`, `signInButton`, `loginLink`, `errorMessage`, `heading`      |
+| Any other user action              | the user's verb                                                       | `signIn(email, password)`, `toggleDarkMode()`                             |
+| Locator properties                 | what it is + kind of element; links use their text                    | `emailInput`, `signInButton`, `loginLink`, `darkModeButton`, `heading`    |
 | Page object classes and files      | PascalCase + `Page`, file named the same                              | `CreateAccountPage` in `CreateAccountPage.ts`                             |
+| Components (part of a screen)      | PascalCase, no `Page` (you can't open it), in `tests/components/`     | `NavBar` in `NavBar.ts`; property on the page object: `navBar`            |
+| Methods                            | camelCase (small first letter)                                        | `toggleDarkMode()`, not `ToggleDarkMode()`                                |
 | Test titles                        | what the user does + expected result, lowercase except on-screen text | `'Login link opens the sign-in page'`, `'wrong password shows the error'` |
 
 Name the user's goal, not the mechanics:
@@ -233,7 +244,7 @@ Name the user's goal, not the mechanics:
 // ✘ Wrong: describes the UI. Untrue if the link becomes a button or its text changes.
 await homePage.clickLoginLink();
 // ✔ Right: describes what the user wants.
-await homePage.openSignIn();
+await homePage.navBar.openSignIn();
 ```
 
 ### Where we differ from the docs on purpose
