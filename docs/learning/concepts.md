@@ -594,7 +594,7 @@ On demand: only fixtures a test names are built ("setup only the ones needed by 
 - **What is JS, TS, Playwright or ours in the fixtures file?** Walked through word by word in [walkthroughs.md](walkthroughs.md#fixtures). Summary: [PW] `test`, `extend`, `page`, `expect`, the `use` function, the fixtures idea. [TS] `type`, `: HomePage`, `<Fixtures>`. [JS] `import`, `as`, `export`, `const`, `async`, `await`, `=>`, `new`, `{ }` picking. [OURS] `base`, `Fixtures`, `homePage`..., the input name `use`, our `test`.
 - **What is a type?** A description of what a value must look like. It never runs; `npm run typecheck` and VS Code check it. `Fixtures` is a type WE made: one object with 5 properties, each holding a specific page object. The name `Fixtures` can be anything; the property names (`homePage`...) are what specs write, so renaming them changes the specs.
   - ✘ `homePage: async ({ page }, use) => { await use(new SignInPage(page)); }` → ✔ `use(new HomePage(page))`
-  - ✘ `async ({ homePge })` or `homePage.opnSignIn()` → ✔ `async ({ homePage })`, `homePage.openSignIn()`
+  - ✘ `async ({ homePge })` or `homePage.navBar.opnSignIn()` → ✔ `async ({ homePage })`, `homePage.navBar.openSignIn()`
 - **Is `use` a Playwright function?** The FUNCTION is Playwright's (handed in as the 2nd input). The NAME `use` is ours, chosen by position (`giveToTest` would work the same). `page` inside `{ }` can NOT be renamed: braces pick by name (✘ `({ tab }, use)` → ✔ `({ page }, use)`).
 - **Who writes it and who calls it?** `async ({ page }, use) => { ... }` is a function WE write. `({ page }, use)` are its inputs (parameters), not a function. Playwright CALLS it and supplies the two values. Same as a test body `async ({ signInPage }) => { ... }`.
 - **Anonymous functions.** The fixture function and every test body are nameless arrow functions. Playwright finds the fixture one by its property name (`homePage:`) and the test one because we hand it to `test()`. Named functions (methods like `goto()`) are ones WE call later.
@@ -602,3 +602,46 @@ On demand: only fixtures a test names are built ("setup only the ones needed by 
 - **More inputs?** Inside `{ }`, pick any existing fixture by name (`({ page, homePage }, use)`); an unknown name fails `npm run typecheck`. Slots after `{ }` are fixed by position: fixtures object, `use`, `testInfo`.
 - **Another function in a fixture?** Not as an input (Playwright fills the slots). Yes inside the body: before `use` = setup, after `use` = cleanup. Or as another fixture. A fixture body only does what EVERY test using it needs (`goto()` stays in the test).
 - **C# / SpecFlow:** fixtures are like SpecFlow hooks plus context injection, except each one is built only for tests that name it, and cleaned up after each test.
+
+## Components and composition (Week 2 Day 1)
+
+Docs: [Page object models](https://playwright.dev/docs/pom). Plan rule: composition over inheritance.
+
+1. **What / problem:** the Main navigation is on every page. If its locators live in `HomePage`, the next page object that needs them copies them, and every copy must be fixed when the nav changes. A **component** is a small class for one part of the page that several pages share (`tests/components/NavBar.ts`).
+2. **How (our app):** the page object HAS the component as a property and builds it in its own constructor:
+   ```ts
+   export class HomePage {
+     readonly navBar: NavBar;
+     constructor(private readonly page: Page) {
+       this.navBar = new NavBar(page); // composition: HomePage HAS a NavBar
+     }
+   }
+   // spec: await homePage.navBar.openSignIn();
+   ```
+   NavBar takes `page` as a plain input and does not store it: no NavBar method uses `this.page`.
+3. **Recommended:** one component per shared part; page objects include only the parts they really have; the page object builds it, so the fixture stays `new HomePage(page)`.
+4. **Alternatives (not used):**
+   - ✘ `class HomePage extends BasePage` (inheritance, "is a"): every page gets everything in the base class, nav or not; only one parent class allowed. ✔ `readonly navBar: NavBar` (composition, "has a").
+   - ✘ `constructor(private readonly page: Page, navBar: NavBar)` (passed in from outside, "dependency injection"): the fixture must become `new HomePage(page, new NavBar(page))`. Useful only when the caller must choose WHICH object goes in. ✔ build it inside.
+   - ✘ copy the nav locators into every page object.
+5. **When OK:** passing a component in is fine when different callers need different versions (e.g. a fake in a unit test).
+6. **Interview:** "Shared parts of the UI are components that page objects include as properties, composition instead of a BasePage. Each page object only has the parts its screen really has, and a change to the nav is fixed in one class."
+
+- **Naming:** components are PascalCase with no `Page` suffix (`NavBar`, not `NavBarPage`): `Page` means a whole screen you can `goto()`; a component is a part inside screens. Later component: `TopicLayout` (Week 3+).
+- **Later:** components that take a root locator (`new Card(page.getByRole('article').nth(0))`) for repeated parts like list items.
+
+## Checking a class, and the one CSS locator (Week 2 Day 1)
+
+- **What the dark mode button does** (`webapp/js/app.js`): `document.documentElement.classList.toggle('dark-mode')`. Before: `<html lang="en">`; after: `<html lang="en" class="dark-mode">`. The app's CSS turns the page dark when it sees that class.
+- **Locator:** `<html>` has no role, label or text, so no user-facing locator can find it. `page.locator('html')` = CSS selector by tag name. Allowed only when nothing user-facing exists ([Locators: CSS or XPath](https://playwright.dev/docs/locators#locate-by-css-or-xpath)). ✘ `page.locator('.primary-nav button')` (role + name exist) / ✔ `page.locator('html')`. Lives on the page object (`HomePage.htmlElement`), because specs hold no locators.
+- **`locator()` itself** ([Locators: CSS or XPath](https://playwright.dev/docs/locators#locate-by-css-or-xpath)): a Playwright method on `page` (and on a Locator, for chaining) that finds elements by a **selector**, a text pattern. CSS by default; XPath also accepted (we never use it).
+  - `page.locator('html')`: by tag name. `page.locator('#email')`: by id (`#`). `page.locator('.nav-icon-btn')`: by class (`.`). `page.locator('//button')`: XPath.
+  - Returns a Locator, same as `getByRole`: `click()`, web-first `expect`, retries all work the same. Chaining: `this.mainNavigation.locator('button')` searches only inside the nav.
+  - Why last resort: `getBy...` find elements the way a user sees them; `locator()` finds them by how the HTML is written, which breaks when a developer renames an id or class.
+- **`toHaveClass` vs `toContainClass`** ([LocatorAssertions](https://playwright.dev/docs/api/class-locatorassertions)):
+  - `toHaveClass('dark-mode')`: the WHOLE class attribute must be exactly `dark-mode`.
+  - `toContainClass('dark-mode')` (Playwright 1.52+): `dark-mode` must be ONE OF the classes.
+  - Example: `<html class="dark-mode large-text">` ✘ `toHaveClass('dark-mode')` fails / ✔ `toContainClass('dark-mode')` passes.
+  - We use `toHaveClass` because `<html>` only ever has that one class today; if the app adds another, switch to `toContainClass`.
+- **Check the start state first:** `await expect(homePage.htmlElement).not.toHaveClass('dark-mode')` before the click. It proves the click is what adds the class. Without it, a page that STARTED dark (e.g. leftover `tp_dark_mode` in localStorage) plus a button that does nothing would still pass the last check. With it, the test fails at the first line and says why. (Alan caught that "would pass on a page that was already dark" alone is wrong: the toggle would make it light and the last check would fail.) Each test gets a fresh browser context (empty localStorage), so the page always starts light.
+- **Finding role and name in Chrome:** right-click → Inspect → Accessibility tab → Computed properties: Role `button`, Name `"Toggle dark mode"` (from `aria-label`; the 🌙 contents are crossed out because aria-label wins). "Show accessibility tree" switches the Elements view to roles; turn it off to see HTML again.
