@@ -1006,6 +1006,37 @@ dir playwright\.auth                              # 5. user.json exists (setup w
 git check-ignore -v playwright/.auth/user.json    # 6. .gitignore:156:/playwright/.auth/   playwright/.auth/user.json  (= ignored, never committed)
 ```
 
+## Step 15. Dashboard search and the topic loader (Week 2 Day 3, part 1)
+
+**Where:** VS Code terminal, repo root `PS C:\git-personal\playwright-typescript-playground>`.
+
+```powershell
+git switch main                          # go to the main branch
+git pull                                 # bring down the latest main from GitHub
+git switch -c feat/dashboard-search      # -c = create the branch AND switch to it (git branch only creates it)
+git branch --show-current                # Check: prints feat/dashboard-search
+```
+
+No new package.
+
+| File                                      | What it is                                                                                                               |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `tests/pages/DashboardPage.ts`            | Adds `searchTopicsInput`, `clearSearchButton`, `topicTitles`, and `searchTopics()`, `clearSearch()`, `openTopic(title)`. |
+| `tests/components/TopicLayout.ts`         | New component: `loadingSpinner` (status containing "Loading...") and `heading` (the topic's `h1`).                       |
+| `tests/fixtures/index.ts`                 | New `topicLayout` fixture.                                                                                               |
+| `tests/specs/dashboard/dashboard.spec.ts` | Three tests: search filters the grid, clear shows all topics again, opening a topic shows the loader then the topic.     |
+
+Rules: `docs/architecture.md`, "Assertions and waiting" and "Page objects".
+
+**Check (fastest first):**
+
+```powershell
+npm run format:check     # 1. Prettier: "All matched files use Prettier code style!"
+npm run lint             # 2. ESLint: no output = no problems
+npm run typecheck        # 3. tsc: no output = no type errors
+npm test                 # 4. 12 passed (1 setup + 11 tests)
+```
+
 ## Run, debug and report commands
 
 **Where:** VS Code terminal, in the repo root.
@@ -1196,3 +1227,5 @@ git log --oneline
 | CI step "Install Playwright Browsers" runs for 10+ minutes (normally under a minute; whole job ~1 min)                                                                                          | The runner is stuck downloading a browser or Linux packages (`--with-deps` uses apt): a slow mirror or a network hang on GitHub's side, not your code.                                                                | Expand the step's log. If the last line hasn't changed for several minutes, click **Cancel workflow**, then **Re-run all jobs**. The workflow's `timeout-minutes: 60` would stop it eventually. Seen 2026-11-09: stuck in apt at `Get:109 ... libdecor-0-0` from azure.archive.ubuntu.com. If it keeps happening: cache browsers between runs, or run the job in the official Playwright Docker image (dependencies preinstalled). |
 | CI warning `No files were found with the provided path: playwright-report/` on the upload step                                                                                                  | A check before the tests (format, lint or typecheck) failed, so the tests never ran and no report exists. The upload step still runs (`if: ${{ !cancelled() }}`) and finds nothing.                                   | Harmless. Fix the failing check (its step has the red cross); the warning goes away. (Week 1 Day 5)                                                                                                                                                                                                                                                                                                                                |
 | `npx playwright test` runs 6 tests instead of 7; `playwright/.auth/user.json` is never created                                                                                                  | The setup file is named `auth-setup.ts` (dash). The setup project's `testMatch: /.*\.setup\.ts/` only matches names ending in `.setup.ts`, so setup silently doesn't run.                                             | `Rename-Item tests\auth-setup.ts auth.setup.ts`, then run again: the list must include `[setup] › auth.setup.ts`. (Week 2 Day 2)                                                                                                                                                                                                                                                                                                   |
+| `npm run typecheck` reports `error TS1005: ',' expected.` on a `getByRole(...)` line                                                                                                            | The options were written without braces: `getByRole('heading', name: title)`. The second input is one object.                                                                                                         | Wrap the options in braces: `getByRole('heading', { name: title })`. (Week 2 Day 3)                                                                                                                                                                                                                                                                                                                                                |
+| `git switch -c feat/...` says `fatal: a branch named '...' already exists`                                                                                                                      | The branch was created earlier (e.g. with `git branch`), which creates it but doesn't switch to it.                                                                                                                   | `git switch feat/dashboard-search` (no `-c`), then `git branch --show-current`. Uncommitted changes come with you. (Week 2 Day 3)                                                                                                                                                                                                                                                                                                  |

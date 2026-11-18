@@ -881,3 +881,136 @@ A **setup project** + `dependencies` + `storageState` in the config (what we did
 - **Who creates `user.json`?** Playwright, when setup's last line runs: `await page.context().storageState({ path: authFile })`. You never create it by hand.
 - **Why `expect` before saving?** It makes setup wait until sign-in has really finished. Saving earlier could store a signed-out state; setup would pass and the dashboard tests would fail with a confusing error.
 - **Why `.setup.ts` and not `-setup.ts`?** The setup project's `testMatch: /.*\.setup\.ts/` only matches names ending in `.setup.ts`. With a dash, setup silently doesn't run (we saw 6 tests instead of 7).
+- **Why does the signed-out dashboard test sit in its own `describe`?** `test.use` applies to its group: the `describe` it's in, or the whole file if it's at the top. The describe keeps the empty state on the signed-out test only. ✘ With `test.use({ storageState: { cookies: [], origins: [] } })` at the top of `dashboard.spec.ts`, the signed-in test would also start signed out, be sent to sign in, and fail on `toHaveCount(4)`. (Week 2 Day 3)
+
+---
+
+## Search, filtering and the loader (Week 2 Day 3)
+
+What we built: dashboard search and clear tests, and "opening a topic shows a loader, then the topic". Our code line by line: [walkthroughs: Dashboard search and TopicLayout](walkthroughs.md#dashboard-search-and-topiclayout-week-2-day-3).
+
+### Accessible name: where it comes from
+
+The browser gives every element one **accessible name** (what a screen reader says). It checks these sources in order and takes the first that has a value:
+
+`aria-labelledby` → `aria-label` → `<label>` → `title` → `placeholder`
+
+- Our search box: `<input type="search" placeholder="Search topics..." aria-label="Search topics">`. The name is "Search topics" (from `aria-label`). DevTools → Accessibility crosses out the placeholder: it exists but was ignored, because a source higher in the list won. "Not specified" = the element doesn't have that source.
+- Some roles never take their name from their text. A `status` element (our loader) only gets a name from `aria-label` / `aria-labelledby`, so `getByRole('status', { name: 'Loading...' })` finds nothing. Use `filter({ hasText })` instead (below).
+
+**`getByLabel` matches `aria-label` too.** Playwright's getByLabel finds an input field by its `<label>`, by `aria-labelledby`, or by the `aria-label` attribute ([getByLabel](https://playwright.dev/docs/api/class-page#page-get-by-label)). So `getByLabel('Search topics')` works on our search box. We use `getByRole('searchbox', { name: 'Search topics' })`, because it also checks the role.
+
+```ts
+// ✘ A placeholder is a hint, not a name: it disappears when you type and screen readers may skip it.
+page.getByPlaceholder('Search topics...');
+// ✔ Role + accessible name, like a screen reader user finds it.
+page.getByRole('searchbox', { name: 'Search topics' });
+```
+
+**What `aria-label` is for.** It's invisible on screen (no tooltip; `title` does that). Screen readers, voice control ("click Clear search") and tools that read the accessibility tree (Playwright's getByRole and getByLabel) use it.
+
+- ✔ Use it when there is no visible text: our ✕ button is `aria-label="Clear search"`. Without it, a screen reader says just "button" and `getByRole('button', { name: 'Clear search' })` finds nothing.
+- ✘ Don't put it on a button that already shows text: it replaces that text, so what the screen reader says no longer matches the screen.
+
+### Heading levels
+
+`<h1>` to `<h6>` rank headings in the page outline (`h1` = the page's main title). The browser turns `<hN>` into role `heading` with level N (DevTools: "Role: heading, Level: 1"). `getByRole('heading', { level: 1 })` matches the `h1` and never an `h3` ([level option](https://playwright.dev/docs/api/class-page#page-get-by-role-option-level)).
+
+We use `level: 1` with no name in `TopicLayout`, because all 10 topic pages share it and each has a different title. The spec checks which title: `await expect(topicLayout.heading).toHaveText('Space Exploration')`. A fixed name in the component would work for one topic only; on any other it would time out with "element not found" instead of "expected X, received Y".
+
+### Filtering locators: `has` and `hasText`
+
+`filter()` keeps only the elements, out of the ones a locator found, that pass a test ([Filtering locators](https://playwright.dev/docs/locators#filtering-locators)).
+
+| Option            | Keeps the ones that...       | Our code                                                                           |
+| ----------------- | ---------------------------- | ---------------------------------------------------------------------------------- |
+| `has: <locator>`  | contain a matching element   | `this.topicCards.filter({ has: this.page.getByRole('heading', { name: title }) })` |
+| `hasText: 'text'` | contain that text (any part) | `page.getByRole('status').filter({ hasText: 'Loading...' })`                       |
+
+Why `openTopic` filters: a card's accessible name is **all** its text ("🚀 Space Exploration TECHNOLOGY ADVANCED 🏆 30pts What would happen... New"), and the header's "Topics navigation" has a link called "Space Exploration" too.
+
+```ts
+// ✘ Matches the header link AND the card: strict mode violation on click().
+page.getByRole('link', { name: 'Space Exploration' });
+// ✔ Only links inside <main> (the cards), then the one containing that heading.
+this.topicCards.filter({
+  has: this.page.getByRole('heading', { name: title }),
+});
+// ✔ Also fine: chain to the heading inside the card and click it (the click lands inside the link).
+//   Shorter, but it returns the heading, not the card.
+this.topicCards.getByRole('heading', { name: title });
+```
+
+**Reading the docs.** In Playwright's docs, `locator.filter()` means "call `filter` on **any** Locator": `locator` is a placeholder, not code to type. Likewise `page.goto()` is our `this.page.goto(...)`.
+
+```ts
+// ✘ Typed the placeholder: `locator` is a method on a Locator, so this has no `filter`.
+this.topicCards.locator.filter({ ... });
+// ✔
+this.topicCards.filter({ ... });
+```
+
+A locator only **describes** what to find; nothing happens in the browser until you call an action (`click()`, `fill()`) or an assertion on it.
+
+### Actions: `fill`, `clear`, `click`
+
+- `fill(text)`: empties an input field and types the text in one go, firing the `input` event. Our dashboard filters on that event, so `fill` triggers the search.
+- `clear()`: empties an **input field**. On a button it fails ("Element is not an input...").
+- `click()`: what a user does to the ✕ button. `clearSearch()` clicks it.
+
+Source: [Actions](https://playwright.dev/docs/input).
+
+### Checking a list: `toHaveText([...])` vs `toContainText([...])`
+
+`[ ... ]` is an **array** [JS]: a list of values in order. `['Space Exploration']` has one string; its type [TS] is `string[]`.
+
+| Assertion on a locator that finds several elements | Checks                                                                                            |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `toHaveText(['A', 'B'])`                           | **exactly** 2 elements, in that order, each text **equal** to A, B                                |
+| `toContainText(['A', 'B'])`                        | **some** elements contain A, then B, in order; extra elements allowed; part of the text is enough |
+| `toHaveText('A')` (no array)                       | exactly **one** element; 2 matches = strict mode violation                                        |
+
+Source: [toHaveText](https://playwright.dev/docs/api/class-locatorassertions#locator-assertions-to-have-text), [toContainText](https://playwright.dev/docs/api/class-locatorassertions#locator-assertions-to-contain-text).
+
+Which **locator** you assert on decides which text is read: `topicCards` reads each whole card; `topicTitles` reads only each card's `<h3>`.
+
+```ts
+// ✘ Passes even if the search filtered NOTHING: Space Exploration is one of the 4 titles, extras are allowed.
+await expect(dashboardPage.topicTitles).toContainText(['Space Exploration']);
+// ✘ Reads the whole card: passes if "Space Exploration" appears in another card's description.
+await expect(dashboardPage.topicCards).toContainText('Space Exploration');
+// ✔ Exactly one card, and its title is exactly "Space Exploration".
+await expect(dashboardPage.topicTitles).toHaveText(['Space Exploration']);
+```
+
+Search for part of a word in lower case (`'space'`): that's what users type, and it proves more than searching for the full title.
+
+### Waiting for a loader: assertions, not waits
+
+Opening a topic shows `<div role="status">...Loading...</div>` for about 1.2 s, then the topic. (The dashboard grid itself has no loader: it fades in 150 ms after loading `topics.json`, which `toHaveCount` already waits for.)
+
+```ts
+await dashboardPage.openTopic('Space Exploration');
+
+await expect(topicLayout.loadingSpinner).toBeVisible(); // re-checks until it shows
+await expect(topicLayout.loadingSpinner).toBeHidden(); // re-checks until it's gone (or not in the page)
+await expect(topicLayout.heading).toHaveText('Space Exploration');
+```
+
+- `toBeHidden` **is** the wait: it moves on the moment the loader goes, and fails after 5 s if it never does (a stuck loader is a bug the test should catch). ([toBeHidden](https://playwright.dev/docs/api/class-locatorassertions#locator-assertions-to-be-hidden))
+- ✘ `await page.waitForTimeout(1200)`: always waits 1.2 s, even when the app is faster, and fails when the app is slower.
+- `await locator.waitFor({ state: 'hidden' })` [PW]: a pure wait with no check. Only where you must wait but not assert, e.g. inside a page-object method (page objects hold no `expect`). In specs use `toBeHidden()`.
+- Strictly, the `toHaveText` line alone would also wait past the loader. `toBeHidden` is there to **prove** the loader goes away.
+
+**C# / Selenium:** `new WebDriverWait(driver, TimeSpan.FromSeconds(5)).Until(ExpectedConditions.InvisibilityOfElementLocated(By.CssSelector(".loading-spinner")))`. Same polling idea, but you build it yourself and a timeout throws `WebDriverTimeoutException` without saying what you expected. ⚠ Watch out: Playwright has no global `ImplicitWait`; actions auto-wait for the element and assertions auto-retry.
+
+**Interview line:** "I never sleep for a loader. I assert it becomes visible, then hidden, then assert the content; each web-first assertion retries until true, so the test is as fast as the app and fails clearly if the loader never goes away."
+
+### Seeing a short-lived element
+
+- **DevTools breakpoint:** Sources → `Ctrl+P` `app.js` → `Ctrl+G` 977 (the `await simulateDelay(1200)` line right after the loader is added) → click the line number → reload. The page freezes with the loader on screen; inspect it in Elements. Remove the breakpoint and press F8 to resume. Nothing in `webapp/` changes.
+- **Trace viewer:** `npx playwright test --trace on`, then open the trace from `npx playwright show-report`. Each step has a DOM snapshot you can inspect.
+
+### Tests that survive content changes (for later)
+
+Our tests use fixed titles ("Space Exploration"). That's right here: `topics.json` is in our repo, so a rename comes in a PR and a failing test is the right signal. In an app whose content comes from a CMS, teams **control the data** instead: mock the content response (`page.route`, Week 7) or seed a test environment with known content. Reading the data from the page at run time (search for whatever the first card is called) survives renames but is weaker and can pass for the wrong reason. Covered in Week 3 Day 2 (test data) and Week 7 (mocking).
