@@ -8,6 +8,7 @@ import { SignInPage } from '../pages/SignInPage';
 import { TaskBoardPage } from '../pages/TaskBoardPage';
 import { CreateAccountPage } from '../pages/CreateAccountPage';
 import { DashboardPage } from '../pages/DashboardPage';
+import { TopicLayout } from '../components/TopicLayout';
 
 /** Every fixture a test can ask for, and the object it holds. */
 type Fixtures = {
@@ -16,6 +17,7 @@ type Fixtures = {
   taskBoardPage: TaskBoardPage;
   createAccountPage: CreateAccountPage;
   dashboardPage: DashboardPage;
+  topicLayout: TopicLayout;
 };
 
 export const test = base.extend<Fixtures>({
@@ -34,6 +36,10 @@ export const test = base.extend<Fixtures>({
   },
   dashboardPage: async ({ page }, use) => {
     await use(new DashboardPage(page));
+  },
+  // A component, not a page: tests ask for it directly until topic page objects hold it.
+  topicLayout: async ({ page }, use) => {
+    await use(new TopicLayout(page));
   },
 });
 

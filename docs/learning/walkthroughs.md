@@ -13,6 +13,7 @@ Contents:
 - [Fixtures](#fixtures) (`tests/fixtures/index.ts`)
 - [NavBar and the dark mode test](#navbar-and-the-dark-mode-test) (`tests/components/NavBar.ts`, `tests/pages/HomePage.ts`, `tests/specs/home/home.spec.ts`) (Week 2 Day 1)
 - [Auth setup and the dashboard tests](#auth-setup-and-the-dashboard-tests) (`tests/auth.setup.ts`, `playwright.config.ts`, `tests/pages/DashboardPage.ts`, `tests/specs/dashboard/dashboard.spec.ts`) (Week 2 Day 2)
+- [Dashboard search and TopicLayout](#dashboard-search-and-topiclayout-week-2-day-3) (`tests/pages/DashboardPage.ts`, `tests/components/TopicLayout.ts`, `tests/fixtures/index.ts`, `tests/specs/dashboard/dashboard.spec.ts`) (Week 2 Day 3)
 
 ---
 
@@ -481,6 +482,8 @@ setup(
 
 ### DashboardPage
 
+The Week 2 Day 2 version. Week 2 Day 3 added search, clear, `openTopic` and `topicTitles`: see [Dashboard search and TopicLayout](#dashboard-search-and-topiclayout-week-2-day-3).
+
 ```ts
 export class DashboardPage {
   readonly heading: Locator;
@@ -502,6 +505,8 @@ export class DashboardPage {
 - `goto()`: opens the dashboard by URL, like a user typing or bookmarking it. Needed because the signed-out test must hit the URL directly; there's no UI path to the dashboard while signed out.
 
 ### dashboard.spec.ts
+
+The two Week 2 Day 2 tests. The three Week 2 Day 3 tests: see [Dashboard search and TopicLayout](#dashboard-search-and-topiclayout-week-2-day-3).
 
 ```ts
 test.describe('Dashboard, signed out', () => {
@@ -536,3 +541,141 @@ test.describe('Dashboard, signed in', () => {
 - `signInPage.heading` visible: the user really sees the sign-in page, not just a URL.
 - Signed in: no `test.use`, so it uses `user.json`. It still calls `goto()` because every test starts on a blank tab.
 - `toHaveCount(4)` [PW]: web-first; retries until there are 4 cards (they load from `topics.json` after a short fade), so no manual wait. ✘ `expect(await dashboardPage.topicCards.count()).toBe(4)` counts once, immediately, and fails if the cards haven't loaded yet.
+
+---
+
+## Dashboard search and TopicLayout (Week 2 Day 3)
+
+Files: `tests/pages/DashboardPage.ts` (new lines only), `tests/components/TopicLayout.ts`, `tests/fixtures/index.ts` (one fixture), `tests/specs/dashboard/dashboard.spec.ts` (three tests). Concepts behind them: [concepts: Search, filtering and the loader](concepts.md#search-filtering-and-the-loader-week-2-day-3).
+
+### DashboardPage: new locators
+
+```ts
+readonly searchTopicsInput: Locator;
+readonly clearSearchButton: Locator;
+readonly topicTitles: Locator;
+...
+this.searchTopicsInput = page.getByRole('searchbox', {
+  name: 'Search topics',
+});
+this.clearSearchButton = page.getByRole('button', { name: 'Clear search' });
+this.topicTitles = this.topicCards.getByRole('heading');
+```
+
+- `getByRole('searchbox', ...)` [PW]: an `<input type="search">` has the role `searchbox`. Its name "Search topics" comes from `aria-label` (there is no `<label>`; the placeholder is ignored).
+- `clearSearchButton` [OURS]: the ✕ button. Its only name is `aria-label="Clear search"` (no visible text). It has the `hidden` attribute until something is typed, and getByRole skips hidden elements, so it is found only after a search. That's fine: tests click it only after searching.
+- `topicTitles` [OURS]: the heading (`<h3>`) inside each card. Built from `topicCards` (chaining), so it searches only inside the cards. Lets a spec check exact titles instead of each card's whole text.
+
+### DashboardPage: new methods
+
+```ts
+async searchTopics(term: string): Promise<void> {
+  await this.searchTopicsInput.fill(term);
+}
+
+async clearSearch(): Promise<void> {
+  await this.clearSearchButton.click();
+}
+
+async openTopic(title: string): Promise<void> {
+  await this.topicCards
+    .filter({ has: this.page.getByRole('heading', { name: title }) })
+    .click();
+}
+```
+
+- `searchTopics(term: string)` [OURS]: named by the user's intent. `term: string` [TS] = the input must be text. `fill` [PW] types it and fires the `input` event the app filters on.
+- `clearSearch()` [OURS]: the user clears the search; the ✕ is how. `click()`, not `clear()` (`clear()` only works on input fields).
+- `openTopic(title)` [OURS]: "open" + where it goes (Naming table). `this.topicCards` = only cards (links in `<main>`), so the header's "Space Exploration" link is out. `.filter({ has: ... })` [PW] keeps the card that contains a heading with that name. `this.page` is used here, which is one more reason the class stores the tab. `.click()` does the action; the filter alone only describes the card.
+
+### TopicLayout
+
+```ts
+export class TopicLayout {
+  readonly loadingSpinner: Locator;
+  readonly heading: Locator;
+
+  constructor(page: Page) {
+    this.loadingSpinner = page
+      .getByRole('status')
+      .filter({ hasText: 'Loading...' });
+    this.heading = page.getByRole('heading', { level: 1 });
+  }
+}
+```
+
+- What it is: a **component** (in `tests/components/`, no `Page` in the name): the layout all 10 topic pages share, at `/html/dashboard.html?topic=<title>`. Today it has only what a test uses: the loader and the title. From Week 3, topic page objects in `tests/pages/topics/` will hold it as `readonly layout: TopicLayout` (composition, like `homePage.navBar`).
+- `constructor(page: Page)` [TS]: a plain input, not `private readonly page`: no method uses the tab later.
+- `getByRole('status')` [PW]: the loader is `<div class="loading-spinner" role="status">`. A status element gets no name from its text, so `{ name: 'Loading...' }` would find nothing. `.filter({ hasText: 'Loading...' })` keeps the status that contains that text, so a status inside a topic widget can't match.
+- `getByRole('heading', { level: 1 })` [PW]: the page's only `h1`, the topic title. No `name`, because the title is different on each topic; the spec checks which one.
+
+### Fixture
+
+```ts
+import { TopicLayout } from '../components/TopicLayout';
+...
+  topicLayout: TopicLayout;
+...
+  topicLayout: async ({ page }, use) => {
+    await use(new TopicLayout(page));
+  },
+```
+
+The same three additions every page object has (import, a line in the `Fixtures` type, a fixture). No topic page object exists yet to hold TopicLayout, so tests ask for it directly: `async ({ dashboardPage, topicLayout })`. Both get the same tab, so after `openTopic` clicks a card, `topicLayout` looks at the topic page that opened. It may go once topic page objects hold `layout`.
+
+### The three tests
+
+```ts
+test('searching filters the grid to matching topics', async ({
+  dashboardPage,
+}) => {
+  await dashboardPage.goto();
+  await expect(dashboardPage.topicCards).toHaveCount(4);
+
+  await dashboardPage.searchTopics('space');
+
+  await expect(dashboardPage.topicTitles).toHaveText(['Space Exploration']);
+});
+```
+
+- `toHaveCount(4)` first: the grid has loaded, so going down to 1 proves the search changed it.
+- `'space'`: part of a word, lower case, as users type. The app matches any part of the title, ignoring case.
+- `toHaveText([...])` [PW] with an array: exactly one title, and it is exactly "Space Exploration". Fails on 0, 2 or the wrong title, and retries while the grid redraws (150 ms fade).
+
+```ts
+test('clearing the search shows all topics again', async ({
+  dashboardPage,
+}) => {
+  await dashboardPage.goto();
+  await expect(dashboardPage.topicCards).toHaveCount(4);
+
+  await dashboardPage.searchTopics('space');
+  await expect(dashboardPage.topicCards).toHaveCount(1);
+
+  await dashboardPage.clearSearch();
+  await expect(dashboardPage.searchTopicsInput).toBeEmpty();
+  await expect(dashboardPage.topicCards).toHaveCount(4);
+});
+```
+
+- `toHaveCount(1)` after searching: the search took effect, so the clear has something to undo.
+- "Reset" means two things a user sees: `toBeEmpty()` [PW] (the input field has no text) and 4 cards back.
+
+```ts
+test('opening a topic shows a loader, then the topic', async ({
+  dashboardPage,
+  topicLayout,
+}) => {
+  await dashboardPage.goto();
+
+  await dashboardPage.openTopic('Space Exploration');
+
+  await expect(topicLayout.loadingSpinner).toBeVisible();
+  await expect(topicLayout.loadingSpinner).toBeHidden();
+  await expect(topicLayout.heading).toHaveText('Space Exploration');
+});
+```
+
+- No count check before `openTopic`: `click()` already waits for the card.
+- `toBeVisible` → `toBeHidden` [PW]: the loader appears, then goes. No `waitForTimeout`: `toBeHidden` moves on as soon as the 1.2 s loader is gone.
+- `toHaveText('Space Exploration')` (one string: one `h1`): we landed on the topic we clicked. `toBeVisible()` would pass on any topic.

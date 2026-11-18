@@ -15,6 +15,7 @@ docs/                 setup-guide.md, architecture.md
 tests/
   components/         parts used on many pages, included by page objects as a property (composition)
     NavBar.ts         the Main navigation: its links, the dark mode button, and their actions
+    TopicLayout.ts    the layout all 10 topic pages share; today the loader and the title (h1)
   fixtures/index.ts   hands each test its page objects by name ({ homePage }); specs import test and expect from here
   auth.setup.ts       setup project: signs in once, saves playwright/.auth/user.json (see "Auth")
   specs/<app area>/   the tests and every expect, one folder per screen the tests start on
@@ -25,7 +26,7 @@ tests/
     SignInPage.ts  HomePage.ts  DashboardPage.ts  CreateAccountPage.ts  TaskBoardPage.ts
 ```
 
-A page object is created the first time a test touches that screen, with only what that test uses (e.g. `CreateAccountPage` has just `heading` until Week 3). A component (`tests/components/`) is a part that appears on 2+ screens. `NavBar` was added in Week 2 Day 1: the Main navigation is on every page, and the plan asks for it then. Today only `HomePage` includes it; other page objects add `readonly navBar` when a test of theirs needs the nav.
+A page object is created the first time a test touches that screen, with only what that test uses (e.g. `CreateAccountPage` has just `heading` until Week 3). A component (`tests/components/`) is a part that appears on 2+ screens. `NavBar` was added in Week 2 Day 1: the Main navigation is on every page, and the plan asks for it then. Today only `HomePage` includes it; other page objects add `readonly navBar` when a test of theirs needs the nav. `TopicLayout` (Week 2 Day 3) is the layout shared by the 10 topic pages; until topic page objects exist (Week 3, in `tests/pages/topics/`, each holding `readonly layout: TopicLayout`), tests get it from its own fixture.
 
 ## Rules we follow
 
@@ -103,6 +104,20 @@ await signInButton.click();
 // ✔ Right
 await signInButton.click();
 ```
+
+A loader: assert it appears, then disappears, then assert the content. `toBeHidden()` is the wait. Never `waitForTimeout`.
+Source: [toBeHidden](https://playwright.dev/docs/api/class-locatorassertions#locator-assertions-to-be-hidden).
+
+```ts
+// ✘ Wrong: always 1.2 s, even when the app is faster; fails when it's slower.
+await page.waitForTimeout(1200);
+// ✔ Right: each line re-checks until true (5 s limit).
+await expect(topicLayout.loadingSpinner).toBeVisible();
+await expect(topicLayout.loadingSpinner).toBeHidden();
+await expect(topicLayout.heading).toHaveText('Space Exploration');
+```
+
+A list: check exact items with `toHaveText([...])` (exact count, order and text). `toContainText([...])` allows extra elements, so it can't prove a filter worked. Details: [concepts: Checking a list](learning/concepts.md#checking-a-list-tohavetext-vs-tocontaintext).
 
 Don't wait for "the network to go quiet". Wait for what the user sees.
 
@@ -240,16 +255,16 @@ Why it works this way: [concepts: Auth and storage state](learning/concepts.md#a
 
 ### Naming
 
-| What                               | Pattern                                                               | Examples                                                                  |
-| ---------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| Open this page directly by its URL | `goto()` (one word, like Playwright's `page.goto()`)                  | `homePage.goto()`, `signInPage.goto()`                                    |
-| Reach another page through the UI  | `open` + destination page object name without `Page`                  | `openSignIn()` → `SignInPage`, `openCreateAccount()`, `openTaskBoard()`   |
-| Any other user action              | the user's verb                                                       | `signIn(email, password)`, `toggleDarkMode()`                             |
-| Locator properties                 | what it is + kind of element; links use their text                    | `emailInput`, `signInButton`, `loginLink`, `darkModeButton`, `heading`    |
-| Page object classes and files      | PascalCase + `Page`, file named the same                              | `CreateAccountPage` in `CreateAccountPage.ts`                             |
-| Components (part of a screen)      | PascalCase, no `Page` (you can't open it), in `tests/components/`     | `NavBar` in `NavBar.ts`; property on the page object: `navBar`            |
-| Methods                            | camelCase (small first letter)                                        | `toggleDarkMode()`, not `ToggleDarkMode()`                                |
-| Test titles                        | what the user does + expected result, lowercase except on-screen text | `'Login link opens the sign-in page'`, `'wrong password shows the error'` |
+| What                               | Pattern                                                               | Examples                                                                                    |
+| ---------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Open this page directly by its URL | `goto()` (one word, like Playwright's `page.goto()`)                  | `homePage.goto()`, `signInPage.goto()`                                                      |
+| Reach another page through the UI  | `open` + destination page object name without `Page`                  | `openSignIn()` → `SignInPage`, `openCreateAccount()`, `openTaskBoard()`, `openTopic(title)` |
+| Any other user action              | the user's verb                                                       | `signIn(email, password)`, `toggleDarkMode()`                                               |
+| Locator properties                 | what it is + kind of element; links use their text                    | `emailInput`, `signInButton`, `loginLink`, `darkModeButton`, `heading`                      |
+| Page object classes and files      | PascalCase + `Page`, file named the same                              | `CreateAccountPage` in `CreateAccountPage.ts`                                               |
+| Components (part of a screen)      | PascalCase, no `Page` (you can't open it), in `tests/components/`     | `NavBar` in `NavBar.ts`; property on the page object: `navBar`                              |
+| Methods                            | camelCase (small first letter)                                        | `toggleDarkMode()`, not `ToggleDarkMode()`                                                  |
+| Test titles                        | what the user does + expected result, lowercase except on-screen text | `'Login link opens the sign-in page'`, `'wrong password shows the error'`                   |
 
 Name the user's goal, not the mechanics:
 
