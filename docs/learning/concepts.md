@@ -76,6 +76,127 @@ Nothing is searched yet. The search happens when you act on it (`await ... .fill
 | Password field | `page.getByLabel('Password')`                   | Playwright also finds it as `getByRole('textbox', { name: 'Password' })` (see the role table). We use `getByLabel` for every form field: the Locators page recommends it for form controls. |
 | Sign In button | `page.getByRole('button', { name: 'Sign In' })` | `getByText('Sign In')` matches the heading AND the button: 2 matches, so the test fails (strict mode). getByRole also checks it really is a button.                                         |
 
+### Why not data-testid? Worked examples (Week 2 Day 2)
+
+The question every team asks: "Test ids never break on a text change. Why not use them everywhere?" Short answer: **a test id checks an attribute users never see; a user-facing locator checks what the user actually gets.** The examples below show the difference on real HTML. Where our app has the element, the HTML is copied from `webapp/`; where it doesn't, the example is marked _(made up)_.
+
+Each example: the HTML today → a realistic bad change (✘) → what each locator does.
+
+**1. `getByRole`: a button becomes a clickable div** (`webapp/html/signin.html`, line 42)
+
+```html
+<!-- Today -->
+<button type="submit" data-testid="signin-submit-button">Sign In</button>
+<!-- ✘ After a "restyle" -->
+<div class="btn" data-testid="signin-submit-button" onclick="submitForm()">
+  Sign In
+</div>
+```
+
+A `<button>` comes with role `button` (screen readers say "Sign In, button"), a Tab stop, Enter/Space to press, and form submit. A `<div>` has none of these: it still works with a mouse, but a keyboard or screen reader user can't use it.
+
+| Locator                                           | On the ✘ HTML                                                              |
+| ------------------------------------------------- | -------------------------------------------------------------------------- |
+| ✔ `page.getByRole('button', { name: 'Sign In' })` | finds nothing (no role) → `click()` times out → **test fails, bug caught** |
+| ✘ `page.getByTestId('signin-submit-button')`      | finds the div, click works → **test passes, bug ships**                    |
+
+Same the other way: the text changes to "Log in" → ✔ fails (a user sees the change too), ✘ passes.
+
+**2. `getByLabel`: the label is unlinked from its input field** (`webapp/html/signin.html`, lines 38–39)
+
+```html
+<!-- Today: for="email" matches id="email", so the field's name is "Email" -->
+<label for="email">Email</label>
+<input type="email" id="email" required data-testid="signin-email-input" />
+<!-- ✘ Someone renames the id; the label now points at nothing -->
+<label for="email">Email</label>
+<input type="email" id="user-email" required data-testid="signin-email-input" />
+```
+
+Screen readers now announce "edit text" with no name, and clicking the word "Email" no longer puts the cursor in the field.
+✔ `getByLabel('Email')` finds nothing → fails, bug caught. ✘ `getByTestId('signin-email-input')` → passes.
+
+**3. `getByText`: wrong message shown** (`#signin-error` on the sign-in page)
+
+```html
+<!-- Today, after a wrong password -->
+<div id="signin-error" ... data-testid="signin-error">
+  Invalid email or password.
+</div>
+<!-- ✘ A bug shows the wrong text (or an empty box) -->
+<div id="signin-error" ... data-testid="signin-error">undefined</div>
+```
+
+✔ `getByRole('main').getByText('Invalid email or password.')` → fails. ✘ `getByTestId('signin-error')` + `toBeVisible()` → passes (the box is there, the message is wrong).
+
+**4. `getByPlaceholder`: the hint disappears** (`webapp/html/create-account.html`, line 40)
+
+```html
+<!-- Today -->
+<input
+  type="text"
+  id="full-name"
+  placeholder="Enter your full name"
+  required
+  data-testid="signup-fullname-input"
+/>
+<!-- ✘ Placeholder removed in a redesign; the user no longer sees what to type -->
+<input
+  type="text"
+  id="full-name"
+  required
+  data-testid="signup-fullname-input"
+/>
+```
+
+✔ `getByPlaceholder('Enter your full name')` → fails. ✘ test id → passes. (Prefer `getByLabel` when the field has a label: a placeholder disappears as soon as you type, so it's a weaker name.)
+
+**5. `getByAltText`: an image loses its text alternative** (footer logo, built in `webapp/js/app.js`)
+
+```html
+<!-- Today -->
+<img src="..." alt="Testing Playground logo" class="footer-logo" />
+<!-- ✘ alt removed: screen readers read the file name, or nothing -->
+<img src="..." class="footer-logo" data-testid="footer-logo" />
+```
+
+✔ `getByAltText('Testing Playground logo')` → fails. ✘ test id → passes.
+
+**6. `getByTitle`: an icon's tooltip is lost** _(made up: our app has no `title` attributes)_
+
+```html
+<!-- Today -->
+<span title="Topics explored" data-testid="explored-count">7</span>
+<!-- ✘ title removed: hovering shows nothing, the number has no meaning -->
+<span data-testid="explored-count">7</span>
+```
+
+✔ `getByTitle('Topics explored')` → fails. ✘ test id → passes.
+
+**The pattern:** in every example the user-facing locator fails exactly when a real user would be hurt, and the test id passes. A test id only fails when someone deletes the test id.
+
+#### What an accessible app gives the tests, and the team
+
+- **Free accessibility checks.** Every passing `getByRole` / `getByLabel` / `getByAltText` proves something a screen reader or keyboard user relies on: the button is a real button, the field has a name, the image has a text alternative. A test id proves none of this.
+- **No extra attributes to maintain.** If the app uses proper HTML (labels, buttons, headings, alt text), the locators already exist. Nobody adds, names, documents or keeps `data-testid` attributes in sync with the tests.
+- **Tests read like the user's steps.** `getByRole('button', { name: 'Sign In' })` is what a manual tester writes in a test case. Easier to review, easier for a new person to read.
+- **The same names serve everyone.** Screen readers, voice control ("click Sign In") and Playwright all use the accessible name. One correct name serves all three.
+- **Legal duty.** UK service providers must make reasonable adjustments for disabled people under the [Equality Act 2010](https://www.gov.uk/guidance/meet-the-requirements-of-equality-and-accessibility-regulations); public sector websites must also meet WCAG 2.2 AA under the [Public Sector Bodies Accessibility Regulations 2018](https://www.gov.uk/guidance/accessibility-requirements-for-public-sector-websites-and-apps). Companies selling into the EU also fall under the European Accessibility Act (applies from 28 June 2025). Tests that use the accessibility tree catch some of these failures early. (Checked 2026-11-17; not legal advice.)
+- **The limit.** Role locators only check what a test touches. A full check of a page (contrast, missing labels on fields no test uses) needs an accessibility scanner: `@axe-core/playwright`, Week 10.
+
+#### The honest counter-case: when a test id is the right choice
+
+- **Text that changes on purpose:** an app translated into several languages, or copy the marketing team rewrites often. A text-based locator then breaks for no user-facing reason. (Middle ground: keep the role, change only the name per language.)
+- **No stable user-facing handle:** a chart, a canvas, an icon with no text or label, a list row whose text is random data.
+- **Two identical elements** that only differ by position, where chaining inside a region (`getByRole('main')...`) still can't tell them apart.
+- **Cost of choosing test ids:** they don't catch broken labels, roles, text or alt text (examples above), and someone has to add and maintain them in the app.
+
+#### How to answer when someone asks "why not just use data-testid?"
+
+"Test ids are stable, but they only prove an attribute exists, one users never see. A role or label locator proves the user can actually find and use the element: if a button turns into a div, or a label stops pointing at its field, our test fails before a customer does. So I use user-facing locators first, and keep test ids for elements with no stable text or role, like charts or translated copy."
+
+Docs: [Locators](https://playwright.dev/docs/locators), [Best practices: use locators](https://playwright.dev/docs/best-practices#use-locators).
+
 ---
 
 ## ARIA, roles and the accessibility tree (Week 1 Day 3)
@@ -645,3 +766,118 @@ Docs: [Page object models](https://playwright.dev/docs/pom). Plan rule: composit
   - We use `toHaveClass` because `<html>` only ever has that one class today; if the app adds another, switch to `toContainClass`.
 - **Check the start state first:** `await expect(homePage.htmlElement).not.toHaveClass('dark-mode')` before the click. It proves the click is what adds the class. Without it, a page that STARTED dark (e.g. leftover `tp_dark_mode` in localStorage) plus a button that does nothing would still pass the last check. With it, the test fails at the first line and says why. (Alan caught that "would pass on a page that was already dark" alone is wrong: the toggle would make it light and the last check would fail.) Each test gets a fresh browser context (empty localStorage), so the page always starts light.
 - **Finding role and name in Chrome:** right-click → Inspect → Accessibility tab → Computed properties: Role `button`, Name `"Toggle dark mode"` (from `aria-label`; the 🌙 contents are crossed out because aria-label wins). "Show accessibility tree" switches the Elements view to roles; turn it off to see HTML again.
+
+## Auth and storage state (Week 2 Day 2)
+
+Docs: [Authentication](https://playwright.dev/docs/auth), [Projects](https://playwright.dev/docs/test-projects).
+
+### What we did today, and why (the short story)
+
+1. **The problem.** The dashboard only shows the topic grid to a signed-in user. Every Playwright test starts in a new, empty **browser context** with a new tab in it. Empty for every app, sign-in or not: no cookies, no localStorage. In OUR app, empty means no `authToken`, so every test starts **signed out**. To test anything behind sign-in, each test would have to fill in the sign-in form first: slow, repeated in every test, and one sign-in bug would fail every test.
+2. **The fix.** Sign in **once per run** (not once per test), before any chromium test starts, and save what the browser remembers about being signed in into a file. Then every test starts with that file loaded, so it starts signed in without touching the form.
+3. **What we built:**
+   - `tests/auth.setup.ts`: signs in through the form (our `SignInPage`), waits until the dashboard shows, then saves the file `playwright/.auth/user.json`.
+   - `playwright.config.ts`: a new project `setup` that runs that file first; the `chromium` project loads the saved file into every test and depends on `setup`.
+   - `sign-in.spec.ts`: its tests now start **signed out** on purpose (`test.use(...)`), because they test the form itself.
+   - `DashboardPage`: `goto()` and `topicCards`.
+   - `dashboard.spec.ts`: signed out → sent to sign in; signed in → sees 4 topic cards.
+   - The saved file is **not** committed: `.gitignore` already lists `/playwright/.auth/` (line 156, added by the Playwright installer in Week 1). Proof: `git check-ignore -v playwright/.auth/user.json`.
+
+### Words used here
+
+- **Browser context** [PW]: the fresh, isolated browser profile Playwright gives each test. Its own cookies and localStorage, nothing shared with other tests. Like a new private window. The browser **program** is shared between the tests of one worker (starting it is slow); each test gets a new **context** (cheap) and a new tab (`page`) inside it. Docs: [Browser contexts](https://playwright.dev/docs/browser-contexts).
+- **localStorage** [JS, browser]: small key/value storage a website keeps in the browser. Survives page reloads.
+- **sessionStorage** [JS, browser]: the same, but cleared when the tab closes. Storage state does **not** save it.
+- **Storage state** [PW]: a JSON file holding a context's cookies and localStorage. Saved with `page.context().storageState({ path })`, loaded with the `storageState` option. "Storage state" is **Playwright's** name (the method and the option), not the browser's. The folder `playwright/.auth/` and the file name `user.json` are **ours**, following the docs' example.
+- **Project** [PW]: a named group of tests in `playwright.config.ts` with its own settings (`setup`, `chromium`).
+- **Dependency** [PW]: `dependencies: ['setup']` = run the `setup` project first; if it fails, don't run this one.
+
+### 1. What and why
+
+Our app decides "signed in" by one value. On sign-in, `webapp/js/app.js` does:
+
+```js
+localStorage.setItem('authToken', 'mock-jwt-token-12345');
+```
+
+and the dashboard checks it (lines 882–884):
+
+```js
+if (!localStorage.getItem('authToken')) {
+  showToast('⚠️ Please log in to access the dashboard.', 'error');
+  window.location.href = 'signin.html?redirect=dashboard';
+```
+
+Every new browser context has empty localStorage → no `authToken` → signed out. Storage state lets us put `authToken` back into every context without using the form.
+
+### 2. How it works in our app: one run, step by step
+
+When you run `npm test`:
+
+1. Playwright sees that `chromium` depends on `setup`, so it runs the **setup project first**. It only runs files ending in `.setup.ts` → `tests/auth.setup.ts`.
+2. Setup signs in through the form, waits until the dashboard URL and heading appear, then **writes** `playwright/.auth/user.json` (it creates the file and folders itself). Its browser context then closes.
+3. The **chromium project** starts. For **each** test, Playwright opens a new context and loads `user.json` into it, so `authToken` is already in localStorage.
+4. Each test starts **signed in, but on a blank tab** (`about:blank`). Storage state restores what the browser remembers, not where it was. So the test still opens its page: `await dashboardPage.goto()`.
+5. Tests that must start signed out override it: `test.use({ storageState: { cookies: [], origins: [] } })` = an empty state instead of the file.
+
+What the saved file contains (ours, 2026-11-17):
+
+```json
+{
+  "cookies": [],
+  "origins": [
+    {
+      "origin": "http://localhost:3000",
+      "localStorage": [
+        { "name": "authToken", "value": "mock-jwt-token-12345" },
+        { "name": "tp_streak_dates", "value": "[\"2026-11-17\"]" }
+      ]
+    }
+  ]
+}
+```
+
+- `cookies` is empty: our app uses none.
+- All localStorage is saved, not just the token (`tp_streak_dates` came along).
+- `tp_username` is missing: the app keeps it in **sessionStorage**, which storage state doesn't save. So signed-in tests won't see the user's name in the nav. No test needs it yet.
+
+### 3. Recommended way
+
+A **setup project** + `dependencies` + `storageState` in the config (what we did). The sign-in step shows in the HTML report and trace like any test, it can use our fixtures and page objects, and if sign-in breaks, setup fails once with a clear error instead of every test failing.
+
+### 4. Alternatives, and what goes wrong
+
+- ✘ **`globalSetup`** (older way): a plain script run before the tests. No trace, no report entry, no fixtures, so harder to debug.
+- ✘ **Sign in through the form in every test** (`beforeEach`): slow; one sign-in bug fails every test; the sign-in screen gets tested 50 times by accident.
+- ✘ **Write `authToken` by hand** (hard-code the state in the config, or `addInitScript`): fastest, but never proves sign-in works. If the app changes how it stores the token, every test still passes while real users can't sign in.
+- **Sign in through an API call**: the best option when the app has an auth API (faster than the form, still real). Ours has none.
+
+### 5. When an alternative is OK
+
+- **Form sign-in in the test itself:** when sign-in IS the feature under test, e.g. `sign-in.spec.ts`. Those tests start signed out and use the form.
+- **API sign-in:** once an app has an auth endpoint.
+- **One account per worker** (tests running in parallel each get their own account): when tests change server-side data for the user. Not needed here: our state is per browser.
+
+### 6. Interview answer
+
+"I sign in once in a setup project and save the browser's cookies and localStorage as storage state; every test project depends on it and starts already authenticated. That keeps tests fast and independent, and only the sign-in tests themselves go through the form, starting from an empty state."
+
+**Advanced, later:** one state file per role (admin, user); one account per parallel worker; saving IndexedDB too (`storageState({ path, indexedDB: true })`).
+
+**SpecFlow / Cucumber:** the closest is a hook that runs once before all tests: SpecFlow `[BeforeTestRun]`, Cucumber `BeforeAll`. You'd sign in there and save the cookies to a file. Differences: a hook isn't a test, so it has no report entry or trace; Playwright's `globalSetup` is the direct equivalent of those hooks, and the setup project goes one step further. `[BeforeScenario]` / `Before` is per scenario = `beforeEach` (sign in every test: the slow option). In Week 6, playwright-bdd scenarios run as Playwright tests, so they use this same setup project.
+
+**C# / Selenium:** no built-in equivalent. You'd sign in in a `[BeforeScenario]` hook, or add cookies with `driver.Manage().Cookies.AddCookie(...)`. ⚠ Watch out: in Selenium you must open the site before setting cookies, and localStorage needs `ExecuteScript`. Playwright loads both into the context before the first page opens.
+
+### Questions that came up (Week 2 Day 2)
+
+- **If setup signs in, why keep the sign-in tests?** Setup **uses** sign-in; the spec **tests** it. Setup never tries a wrong password, so without `sign-in.spec.ts` nothing checks the error message. And if sign-in broke, setup would fail with "setup failed" and skip everything, not a named test saying which feature broke. Rule: test a feature through the UI once, in its own spec; every other test gets past it with storage state.
+- **Why do the sign-in tests need `test.use(...)` now?** Since `chromium` loads `user.json`, every test starts signed in, including these. A real user isn't signed in when they sign in. If the app ever sent signed-in users away from the sign-in page, these tests would break for the wrong reason.
+- **Why does the signed-in test still call `goto()`?** It starts signed in but on a blank tab. The sign-in that landed on the dashboard happened in setup's context, which closed after saving.
+- **Signing out lands on `/html/signin.html`, so why does the test expect `?redirect=dashboard`?** Two different paths in the app. Sign out (`app.js` line 1173) → `signin.html`. The dashboard guard (line 884) → `signin.html?redirect=dashboard`. Our test opens the dashboard while signed out, so it hits the guard. The `?redirect` part proves the guard fired AND remembered where the user was going (after sign-in, lines 1242–1244 send them back).
+- **Does "empty" mean only that `authToken` is missing?** No. Every new context is completely empty (no cookies, no localStorage) for any app. Missing `authToken` is what that means for OUR app: signed out.
+- **Does setup run before each test?** No: once per run, before the chromium project starts. Every test then loads the same saved file into its own new context.
+- **Is `setup` Playwright's `test`?** It's our `test` from `tests/fixtures`, which is Playwright's `test` extended with our fixtures (`base.extend` in `fixtures/index.ts`). So it has everything Playwright's has (`page`, `test.use`, `test.describe`) plus `signInPage`, `dashboardPage`. `as setup` only renames it in this file.
+- **What if setup and the config name different files?** Setup WRITES the path in `authFile`; the config's `storageState` READS its path. If they differ (e.g. config says `playwright/.auth/admin.json`), setup passes but every chromium test fails before it starts with an error reading the storage state file (ENOENT: no such file or directory).
+- **Who creates `user.json`?** Playwright, when setup's last line runs: `await page.context().storageState({ path: authFile })`. You never create it by hand.
+- **Why `expect` before saving?** It makes setup wait until sign-in has really finished. Saving earlier could store a signed-out state; setup would pass and the dashboard tests would fail with a confusing error.
+- **Why `.setup.ts` and not `-setup.ts`?** The setup project's `testMatch: /.*\.setup\.ts/` only matches names ending in `.setup.ts`. With a dash, setup silently doesn't run (we saw 6 tests instead of 7).

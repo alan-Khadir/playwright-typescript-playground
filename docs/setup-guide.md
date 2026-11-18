@@ -973,6 +973,39 @@ npm run typecheck      # 3. tsc: no output = no type errors
 npm test               # 4. 6 passed
 ```
 
+## Step 14. Auth setup project and dashboard tests (Week 2 Day 2)
+
+**Where:** VS Code terminal, repo root `PS C:\git-personal\playwright-typescript-playground>`.
+
+```powershell
+git switch main                            # go to the main branch
+git pull                                   # bring down the latest main from GitHub
+git switch -c feat/auth-storage-state      # -c = create today's branch and switch to it
+```
+
+No new package: storage state and projects are part of `@playwright/test`.
+
+| File                                      | What it is                                                                                                                                      |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tests/auth.setup.ts`                     | Signs in through `SignInPage`, waits for the dashboard, saves `playwright/.auth/user.json`. The name must end in `.setup.ts` (dot, not dash).   |
+| `playwright.config.ts`                    | New `setup` project (`testMatch: /.*\.setup\.ts/`); `chromium` gets `storageState: 'playwright/.auth/user.json'` and `dependencies: ['setup']`. |
+| `tests/pages/DashboardPage.ts`            | Stores `page`; adds `topicCards` (`getByRole('main').getByRole('link')`) and `goto()`.                                                          |
+| `tests/specs/sign-in/sign-in.spec.ts`     | `test.use({ storageState: { cookies: [], origins: [] } })` at the top of the describe: sign-in tests start signed out.                          |
+| `tests/specs/dashboard/dashboard.spec.ts` | Signed out → `/html/signin.html?redirect=dashboard`; signed in → heading + 4 topic cards.                                                       |
+
+Rules: `docs/architecture.md`, "Auth".
+
+**Check (fastest first):**
+
+```powershell
+npm run format:check                              # 1. Prettier: "All matched files use Prettier code style!"
+npm run lint                                      # 2. ESLint: no output = no problems
+npm run typecheck                                 # 3. tsc: no output = no type errors
+npm test                                          # 4. 9 passed (1 setup + 8 tests)
+dir playwright\.auth                              # 5. user.json exists (setup wrote it)
+git check-ignore -v playwright/.auth/user.json    # 6. .gitignore:156:/playwright/.auth/   playwright/.auth/user.json  (= ignored, never committed)
+```
+
 ## Run, debug and report commands
 
 **Where:** VS Code terminal, in the repo root.
@@ -1162,3 +1195,4 @@ git log --oneline
 | `warning: in the working copy of '...', LF will be replaced by CRLF the next time Git touches it` on `git add`                                                                                  | Git for Windows converts line endings: files use LF (Unix style) in the repo and CRLF (Windows style) on disk (`core.autocrlf=true`).                                                                                 | Fixed by `.gitattributes` (`* text=auto eol=lf`, Step 10c): Git now stores and checks out LF on every machine. If an old clone still shows CRLF in the VS Code status bar, commit your work, then run `git rm -r -q --cached .` and `git reset --hard`.                                                                                                                                                                            |
 | CI step "Install Playwright Browsers" runs for 10+ minutes (normally under a minute; whole job ~1 min)                                                                                          | The runner is stuck downloading a browser or Linux packages (`--with-deps` uses apt): a slow mirror or a network hang on GitHub's side, not your code.                                                                | Expand the step's log. If the last line hasn't changed for several minutes, click **Cancel workflow**, then **Re-run all jobs**. The workflow's `timeout-minutes: 60` would stop it eventually. Seen 2026-11-09: stuck in apt at `Get:109 ... libdecor-0-0` from azure.archive.ubuntu.com. If it keeps happening: cache browsers between runs, or run the job in the official Playwright Docker image (dependencies preinstalled). |
 | CI warning `No files were found with the provided path: playwright-report/` on the upload step                                                                                                  | A check before the tests (format, lint or typecheck) failed, so the tests never ran and no report exists. The upload step still runs (`if: ${{ !cancelled() }}`) and finds nothing.                                   | Harmless. Fix the failing check (its step has the red cross); the warning goes away. (Week 1 Day 5)                                                                                                                                                                                                                                                                                                                                |
+| `npx playwright test` runs 6 tests instead of 7; `playwright/.auth/user.json` is never created                                                                                                  | The setup file is named `auth-setup.ts` (dash). The setup project's `testMatch: /.*\.setup\.ts/` only matches names ending in `.setup.ts`, so setup silently doesn't run.                                             | `Rename-Item tests\auth-setup.ts auth.setup.ts`, then run again: the list must include `[setup] › auth.setup.ts`. (Week 2 Day 2)                                                                                                                                                                                                                                                                                                   |

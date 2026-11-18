@@ -36,9 +36,21 @@ export default defineConfig({
 
   /* Configure projects for major browsers */
   projects: [
+    /* Signs in once and saves cookies + localStorage to playwright/.auth/user.json.
+       Runs only files ending in .setup.ts. https://playwright.dev/docs/auth */
+    {
+      name: 'setup',
+      testMatch: /.*\.setup\.ts/,
+    },
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        /* Every test starts signed in: the context loads the file setup saved. */
+        storageState: 'playwright/.auth/user.json',
+      },
+      /* setup runs first; if it fails, chromium's tests don't run. */
+      dependencies: ['setup'],
     },
 
     /* Off: Chromium only on every run, for fast feedback (plan, Week 1 Day 2).
