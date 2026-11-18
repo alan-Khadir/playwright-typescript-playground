@@ -4,6 +4,9 @@
 import { test, expect } from '../../fixtures';
 
 test.describe('Sign in', () => {
+  // Start signed out: these tests sign in through the form themselves.
+  test.use({ storageState: { cookies: [], origins: [] } });
+
   // Lists `page` because it checks the tab's URL directly; all three share one tab.
   test('valid user reaches the dashboard', async ({
     page,

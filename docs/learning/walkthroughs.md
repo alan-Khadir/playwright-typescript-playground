@@ -12,6 +12,7 @@ Contents:
 - [Sign-in spec](#sign-in-spec) (`tests/specs/sign-in/sign-in.spec.ts`)
 - [Fixtures](#fixtures) (`tests/fixtures/index.ts`)
 - [NavBar and the dark mode test](#navbar-and-the-dark-mode-test) (`tests/components/NavBar.ts`, `tests/pages/HomePage.ts`, `tests/specs/home/home.spec.ts`) (Week 2 Day 1)
+- [Auth setup and the dashboard tests](#auth-setup-and-the-dashboard-tests) (`tests/auth.setup.ts`, `playwright.config.ts`, `tests/pages/DashboardPage.ts`, `tests/specs/dashboard/dashboard.spec.ts`) (Week 2 Day 2)
 
 ---
 
@@ -418,3 +419,120 @@ test.describe('Dark mode', () => {
 - `.not.toHaveClass('dark-mode')` [PW]: start state. Proves the click is what adds the class: if the page started dark (leftover localStorage) and the button did nothing, the last check alone would still pass.
 - `homePage.navBar.toggleDarkMode()`: spec → page object → component → Playwright (three hops at most).
 - `.toHaveClass('dark-mode')` [PW]: web-first, retries up to 5 s. A string must match the WHOLE class attribute; `<html>` only gets `dark-mode`, so that's fine. If the app ever adds more classes, use `toContainClass('dark-mode')`.
+
+## Auth setup and the dashboard tests
+
+Week 2 Day 2. Concept: [Auth and storage state](concepts.md#auth-and-storage-state-week-2-day-2).
+
+### auth.setup.ts
+
+```ts
+import path from 'path';
+import { test as setup, expect } from './fixtures';
+
+const authFile = path.join(__dirname, '../playwright/.auth/user.json');
+
+setup(
+  'sign in as user@test.com',
+  async ({ page, signInPage, dashboardPage }) => {
+    await signInPage.goto();
+    await signInPage.signIn('user@test.com', 'Password123');
+
+    await expect(page).toHaveURL('/html/dashboard.html');
+    await expect(dashboardPage.heading).toBeVisible();
+
+    await page.context().storageState({ path: authFile });
+  },
+);
+```
+
+- `import path from 'path'` [Node]: Node's built-in module for building file paths that work on Windows and Linux.
+- `import { test as setup, expect } from './fixtures'` [JS + OURS]: our `test` = Playwright's `test` extended with our page-object fixtures (`base.extend` in `fixtures/index.ts`), so it has everything Playwright's has plus ours. Renamed to `setup` with `as`, so the file reads as setup and the report shows it as such. `./` = same folder (`tests/`), unlike specs (`../../fixtures`).
+- `path.join(__dirname, '../playwright/.auth/user.json')` [Node]: `__dirname` = the folder this file is in (`tests/`); `..` = up one = repo root. Result: `<repo>/playwright/.auth/user.json`. Setup WRITES this path; the config's `storageState` READS its own copy of the path. Both must name the same file: if they differ, every chromium test fails with an error reading the storage state file (ENOENT).
+- `setup('sign in as user@test.com', async ({ page, signInPage, dashboardPage }) => { ... })`: one setup step. It lists `page` because the last line uses it, and two page objects from fixtures.
+- `signInPage.goto()` / `signIn(...)` [OURS]: the same page-object methods the sign-in spec uses; no new code.
+- The two `expect` lines [PW]: wait until sign-in has really finished (URL changed, heading shown) before saving. Without them, the file could be saved signed out.
+- `page.context().storageState({ path: authFile })` [PW]: `page.context()` = the browser context this tab belongs to; `storageState({ path })` writes its cookies and localStorage to the file, creating folders if needed.
+
+### playwright.config.ts: the two projects
+
+```ts
+  projects: [
+    {
+      name: 'setup',
+      testMatch: /.*\.setup\.ts/,
+    },
+    {
+      name: 'chromium',
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: 'playwright/.auth/user.json',
+      },
+      dependencies: ['setup'],
+    },
+```
+
+- `name: 'setup'` [PW]: the project's name; `dependencies` refers to it.
+- `testMatch: /.*\.setup\.ts/` [JS regex + PW]: this project runs only files whose names end in `.setup.ts` (`\.` = a real dot). `chromium` has no `testMatch`, so it uses the default (`.spec.ts` / `.test.ts`), which is why setup doesn't run twice.
+- `...devices['Desktop Chrome']` [JS spread + PW]: copies Chrome's viewport and user agent into `use`. Unchanged.
+- `storageState: 'playwright/.auth/user.json'` [PW]: every new context in this project starts with the cookies and localStorage from this file (path from the repo root).
+- `dependencies: ['setup']` [PW]: run `setup` first; if it fails, chromium's tests don't run. Also why `--project=chromium` still runs setup.
+- When Firefox and WebKit come back (Week 9), each needs the same `storageState` and `dependencies` lines.
+
+### DashboardPage
+
+```ts
+export class DashboardPage {
+  readonly heading: Locator;
+  readonly topicCards: Locator;
+
+  constructor(private readonly page: Page) {
+    this.heading = page.getByRole('heading', { name: 'Choose a Topic' });
+    this.topicCards = page.getByRole('main').getByRole('link');
+  }
+
+  async goto(): Promise<void> {
+    await this.page.goto('/html/dashboard.html');
+  }
+}
+```
+
+- `private readonly page` [TS]: now stored, because `goto()` uses `this.page`. (Before today the constructor took `page: Page` as a plain input: nothing used it later.)
+- `topicCards` [OURS]: each card is an `<a href="dashboard.html?topic=...">` (role `link`). Header and breadcrumb links sit outside `<main>`, so "every link inside main" = exactly the cards. No `name`, because we want all of them (strict mode only applies when you act on one element; `toHaveCount` is fine with many).
+- `goto()`: opens the dashboard by URL, like a user typing or bookmarking it. Needed because the signed-out test must hit the URL directly; there's no UI path to the dashboard while signed out.
+
+### dashboard.spec.ts
+
+```ts
+test.describe('Dashboard, signed out', () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  test('signed-out user is sent to sign in', async ({
+    page,
+    dashboardPage,
+    signInPage,
+  }) => {
+    await dashboardPage.goto();
+
+    await expect(page).toHaveURL('/html/signin.html?redirect=dashboard');
+    await expect(signInPage.heading).toBeVisible();
+  });
+});
+
+test.describe('Dashboard, signed in', () => {
+  test('signed-in user sees the topic grid', async ({ dashboardPage }) => {
+    await dashboardPage.goto();
+
+    await expect(dashboardPage.heading).toBeVisible();
+    await expect(dashboardPage.topicCards).toHaveCount(4);
+  });
+});
+```
+
+- Two `describe` groups, because `test.use` applies to its whole group: only the signed-out group gets the empty state.
+- `test.use({ storageState: { cookies: [], origins: [] } })` [PW]: an empty state instead of `user.json` → no `authToken` → signed out. The same line sits at the top of `sign-in.spec.ts`'s describe.
+- Signed out lists `page` because it checks the URL of the tab directly.
+- `toHaveURL('/html/signin.html?redirect=dashboard')` [PW]: a string must match the whole URL, query included (joined to `baseURL`). Proves the guard fired and kept the redirect.
+- `signInPage.heading` visible: the user really sees the sign-in page, not just a URL.
+- Signed in: no `test.use`, so it uses `user.json`. It still calls `goto()` because every test starts on a blank tab.
+- `toHaveCount(4)` [PW]: web-first; retries until there are 4 cards (they load from `topics.json` after a short fade), so no manual wait. ✘ `expect(await dashboardPage.topicCards.count()).toBe(4)` counts once, immediately, and fails if the cards haven't loaded yet.

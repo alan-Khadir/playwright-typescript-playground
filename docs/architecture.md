@@ -7,6 +7,7 @@ How this framework is organised, and the rules every test follows. This file say
 Folders are created when the first file needs them, so this grows week by week.
 
 ```
+playwright/.auth/     saved sign-in state (user.json). Gitignored: written by every run, never committed.
 webapp/               the app under test. Never changed to make a test pass.
 docs/                 setup-guide.md, architecture.md
   learning/           concepts.md (how things work), walkthroughs.md (our files, line by line)
@@ -15,9 +16,11 @@ tests/
   components/         parts used on many pages, included by page objects as a property (composition)
     NavBar.ts         the Main navigation: its links, the dark mode button, and their actions
   fixtures/index.ts   hands each test its page objects by name ({ homePage }); specs import test and expect from here
+  auth.setup.ts       setup project: signs in once, saves playwright/.auth/user.json (see "Auth")
   specs/<app area>/   the tests and every expect, one folder per screen the tests start on
     sign-in/sign-in.spec.ts
     home/home.spec.ts
+    dashboard/dashboard.spec.ts
   pages/              one page object per screen: locators and actions, no expect
     SignInPage.ts  HomePage.ts  DashboardPage.ts  CreateAccountPage.ts  TaskBoardPage.ts
 ```
@@ -224,6 +227,16 @@ test('Login link opens the sign-in page', async ({
 - Not used: `beforeEach` with `let homePage` (reassignable, built even when unused, not shareable across files); `BaseTest` or `BasePage` classes (inheritance, see Page objects).
 
 Source: [Fixtures](https://playwright.dev/docs/test-fixtures).
+
+### Auth
+
+- Tests start **signed in** by default. The `setup` project (`tests/auth.setup.ts`) signs in once through the form and saves storage state to `playwright/.auth/user.json`; the `chromium` project loads it (`storageState`) and runs after setup (`dependencies: ['setup']`).
+- A test that must start signed out opts out for its whole `describe`: `test.use({ storageState: { cookies: [], origins: [] } })`. Used by `sign-in.spec.ts` and the signed-out dashboard test.
+- A feature is tested through the UI once, in its own spec (sign-in in `sign-in.spec.ts`). Every other test gets past it with storage state.
+- `playwright/.auth/` is gitignored (it holds a real session). Never commit it.
+- Every browser project must have `storageState` and `dependencies: ['setup']`.
+
+Why it works this way: [concepts: Auth and storage state](learning/concepts.md#auth-and-storage-state-week-2-day-2). Source: [Authentication](https://playwright.dev/docs/auth).
 
 ### Naming
 
