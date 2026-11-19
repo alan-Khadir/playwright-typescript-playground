@@ -7,6 +7,13 @@ How this framework is organised, and the rules every test follows. This file say
 Folders are created when the first file needs them, so this grows week by week.
 
 ```
+playwright.config.ts  Playwright settings: baseURL, retries, reporter, projects (setup, chromium)
+package.json          npm scripts (test, test:smoke, lint, typecheck, format:check) and dependencies
+tsconfig.json         TypeScript settings (strict)
+eslint.config.mjs     lint rules; .prettierrc.json = layout rules
+.github/workflows/
+  playwright.yml      CI: format:check, lint, typecheck, test on every PR and every push to main
+README.md             what the repo is, how to run it, Guardrails
 playwright/.auth/     saved sign-in state (user.json). Gitignored: written by every run, never committed.
 .env.example          every setting from an environment variable, with a safe sample value. Copy to .env (gitignored).
 webapp/               the app under test. Never changed to make a test pass.
@@ -28,6 +35,18 @@ tests/
 ```
 
 A page object is created the first time a test touches that screen, with only what that test uses (e.g. `CreateAccountPage` has just `heading` until Week 3). A component (`tests/components/`) is a part that appears on 2+ screens. `NavBar` was added in Week 2 Day 1: the Main navigation is on every page, and the plan asks for it then. Today only `HomePage` includes it; other page objects add `readonly navBar` when a test of theirs needs the nav. `TopicLayout` (Week 2 Day 3) is the layout shared by the 10 topic pages; until topic page objects exist (Week 3, in `tests/pages/topics/`, each holding `readonly layout: TopicLayout`), tests get it from its own fixture.
+
+## Adding a test
+
+Example: a test that starts on the Task Board.
+
+1. **Spec:** `tests/specs/<screen it starts on>/`, e.g. `tests/specs/task-board/task-board.spec.ts`. Import `test` and `expect` from `../../fixtures`. One `test.describe` per file, tagged `@regression`.
+2. **Page object:** if it exists (`TaskBoardPage.ts` does), add only the locators and methods your test needs. If not, create `tests/pages/<Name>Page.ts`. No `expect`.
+3. **Component:** only if the part is on 2+ screens. Goes in `tests/components/`, added as a property of each page object.
+4. **Fixture:** a new page object gets one in `tests/fixtures/index.ts`. Existing ones already have one.
+5. **Auth:** tests start signed in. Signed out: `test.use({ storageState: { cookies: [], origins: [] } })` on the describe.
+6. **Smoke:** add `@smoke` only if it passes the smoke question (see Tags).
+7. **Checks, in order:** `npm run format:check`, `npm run lint`, `npm run typecheck`, `npm test`.
 
 ## Rules we follow
 
@@ -240,7 +259,7 @@ test('Login link opens the sign-in page', async ({
 - List exactly the names the test body uses. Add `page` only if the test uses it directly (e.g. `expect(page).toHaveURL(...)`).
 - All fixtures in one test share one tab: Playwright builds `page` once per test and every fixture that asks for it gets the same one.
 - A fixture only builds the object (`await use(new HomePage(page))`). Steps such as `goto()` stay in the test, because not every test starts on the same page.
-- Not used: `beforeEach` with `let homePage` (reassignable, built even when unused, not shareable across files); `BaseTest` or `BasePage` classes (inheritance, see Page objects).
+- Not used: `beforeEach` with `let homePage` (reassignable, built even when unused, not shareable across files); `BaseTest` or `BasePage` classes (inheritance, see Page objects). Why: [decision record 002](decisions/002-framework-design.md).
 
 Source: [Fixtures](https://playwright.dev/docs/test-fixtures).
 
@@ -305,6 +324,13 @@ await homePage.navBar.openSignIn();
 | Docs say                                                                                        | We do                   | Why                                                                                                                                         |
 | ----------------------------------------------------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | [Test across all browsers](https://playwright.dev/docs/best-practices#test-across-all-browsers) | Chromium only (for now) | Fast feedback while the framework is built; Firefox and WebKit return in Week 9. WebKit also can't launch on Windows locally (libwebp.dll). |
+
+## Decisions
+
+Why the framework is shaped this way, one record per topic, in [decisions/](decisions/):
+
+- [001. Week 1 tooling and workflow](decisions/001-week-1-tooling-and-workflow.md): PRs and squash merge, the three checking tools, check order, TypeScript pin, line endings
+- [002. Framework design](decisions/002-framework-design.md): fixtures, composition with no base classes, assertions in specs, pages mirror specs
 
 ## Official docs
 

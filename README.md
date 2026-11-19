@@ -66,7 +66,7 @@ Checks that stop bad code reaching `main`. Each catches a different kind of prob
 | Document                                                       | What's in it                                                                                                                |
 | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | [docs/setup-guide.md](docs/setup-guide.md)                     | Every tool, install command and config file; [Git workflow](docs/setup-guide.md#git-workflow-every-change); Troubleshooting |
-| [docs/architecture.md](docs/architecture.md)                   | Folder structure, the rules every test follows, naming                                                                      |
+| [docs/architecture.md](docs/architecture.md)                   | Folder structure, adding a test, the rules every test follows, naming                                                       |
 | [docs/decisions/](docs/decisions/)                             | Decision records: what we chose, why, and what we rejected                                                                  |
 | [docs/learning/concepts.md](docs/learning/concepts.md)         | How each TypeScript and Playwright concept works, with C#/Selenium comparisons                                              |
 | [docs/learning/walkthroughs.md](docs/learning/walkthroughs.md) | Our page objects, specs and fixtures explained line by line                                                                 |
