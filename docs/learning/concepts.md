@@ -1014,3 +1014,110 @@ await expect(topicLayout.heading).toHaveText('Space Exploration');
 ### Tests that survive content changes (for later)
 
 Our tests use fixed titles ("Space Exploration"). That's right here: `topics.json` is in our repo, so a rename comes in a PR and a failing test is the right signal. In an app whose content comes from a CMS, teams **control the data** instead: mock the content response (`page.route`, Week 7) or seed a test environment with known content. Reading the data from the page at run time (search for whatever the first card is called) survives renames but is weaker and can pass for the wrong reason. Covered in Week 3 Day 2 (test data) and Week 7 (mocking).
+
+---
+
+## Tags and environment variables (Week 2 Day 3)
+
+What we built: `@smoke` / `@regression` tags on every test, and `BASE_URL` read from a `.env` file. Rules: [architecture: Tags](../architecture.md#tags) and [Environment variables](../architecture.md#environment-variables). Our code line by line: [walkthroughs: Tags and BASE_URL](walkthroughs.md#tags-and-base_url-week-2-day-3-part-2).
+
+### Tags
+
+**What and why.** A tag is a label on a test, so a run can pick a group by name instead of by file. Two groups matter to us:
+
+- **Smoke**: "is the app basically alive?". A few fast tests on the paths the app is useless without. Run on every PR (from Week 9), so feedback comes in seconds.
+- **Regression**: every test. Run nightly (from Week 9), where time matters less than coverage.
+
+**How, in our code** [PW]: a details object between the title and the function ([Tag tests](https://playwright.dev/docs/test-annotations#tag-tests)). Tags must start with `@`.
+
+```ts
+// On a describe: every test inside gets @regression.
+test.describe('Sign in', { tag: '@regression' }, () => {
+  // On a test: adds @smoke, so this test has both.
+  test('valid user reaches the dashboard', { tag: '@smoke' }, async ({ ... }) => {
+  // No tag of its own: it still has @regression from the describe.
+  test('wrong password shows the error', async ({ signInPage }) => {
+```
+
+**Running a group** [PW]:
+
+```powershell
+npx playwright test --grep '@smoke'          # only tests whose title or tags match @smoke (+ setup)
+npx playwright test --grep-invert '@smoke'   # everything EXCEPT @smoke
+npx playwright test --grep '@smoke' --list   # show what would run, run nothing
+npm run test:smoke                           # [OURS] the same as the first line, from package.json
+```
+
+- `--grep` is a regular expression matched against the test's full title **and** its tags. `"@fast|@slow"` = either tag.
+- Tests picked by `--grep` still bring their **dependency projects**: `setup` runs first even though it has no tag ([Project dependencies](https://playwright.dev/docs/test-projects#dependencies)). `--no-deps` would skip it.
+
+✘ / ✔ in PowerShell:
+
+```powershell
+npx playwright test --grep @smoke     # ✘ PowerShell reports: The variable '$smoke' cannot be retrieved because it has not been set.
+npx playwright test --grep '@smoke'   # ✔ quoted: PowerShell passes the text @smoke to Playwright
+```
+
+In PowerShell `@name` means "splatting": pass the variable `$name` as arguments. Quotes make it plain text. Bash (CI) doesn't need them, but they work there too. npm scripts don't need them either: npm runs scripts with cmd.exe on Windows and sh on Linux.
+
+**Recommended way.** `@regression` once per describe, `@smoke` on a handful of tests, chosen by "if only this test failed, would we block the merge?". Run smoke through `npm run test:smoke`.
+
+**Alternatives, and what goes wrong:**
+
+- Separate folders (`tests/smoke/`, `tests/regression/`): moving a file changes its category, and a test can't be in both.
+- A Playwright project per group (`testMatch` on folders): the same problem, plus a duplicated project setup.
+- The tag inside the title (`'valid user reaches the dashboard @smoke'`): the older style; it still works, but mixes the test's name with its label.
+- `@regression` written on every test: easy to forget one, and that test silently drops out of the nightly run.
+
+**When an alternative is OK.** Many teams don't use `@regression` at all: nightly simply runs everything with no `--grep`. The tag earns its place once some tests must be kept out of the nightly run (e.g. `@visual`).
+
+**Interview answer.** "I tag a small, fast set of critical-path tests `@smoke` and run them with `--grep` on every pull request; the full regression suite runs nightly. Tags are set on the test or its describe block, so a test's group doesn't depend on which folder it lives in."
+
+**Advanced, later:** tags for run types (`@visual`, `@slow`) excluded with `--grep-invert`; `grep` / `grepInvert` set per project in the config; annotations (`test.fail`, `test.fixme`) for known bugs.
+
+**C# / Selenium / SpecFlow:** NUnit `[Category("Smoke")]` and `dotnet test --filter TestCategory=Smoke`; SpecFlow `@smoke` on a scenario or feature becomes the same category. ⚠ Watch out: SpecFlow's feature-level tag is inherited by scenarios like our describe-level tag, but `--grep` is a regular expression, not an exact category name: `--grep @smoke` would also match a tag called `@smoke-extra`.
+
+### Environment variables and .env
+
+**What and why.** An **environment variable** is a named value that the shell or CI gives to a program from outside the code. Node puts all of them in `process.env` [Node]. The app's address used to be written into the config; now it comes from `BASE_URL`, so the same tests can run against another address without editing code.
+
+A **.env file** is a text file of `NAME=value` lines. The **dotenv** package [Node-npm] reads it into `process.env` when the config loads.
+
+| File           | Committed?      | Read by code?             | Holds                                                    |
+| -------------- | --------------- | ------------------------- | -------------------------------------------------------- |
+| `.env`         | No (gitignored) | Yes, by `dotenv.config()` | Your values, later also secrets                          |
+| `.env.example` | Yes             | No                        | Every variable name with a safe sample value, for others |
+
+A newcomer runs `Copy-Item .env.example .env` once and edits their copy. Today `.env` is optional: every variable has a default.
+
+**How it decides, in order:**
+
+1. A variable already set in the shell or by CI (`$env:BASE_URL='http://localhost:3003'`). dotenv never overwrites a value that's already set.
+2. `BASE_URL=` in `.env`, if it isn't empty.
+3. The default in the config: `process.env.BASE_URL || 'http://localhost:3000'`.
+
+In CI there is no `.env` (it's never committed) and the workflow sets no `BASE_URL`, so step 3 gives `http://localhost:3000`, the app `webServer` starts there.
+
+```ts
+baseURL: process.env.BASE_URL ?? 'http://localhost:3000',  // ✘ ?? only replaces undefined/null: BASE_URL= (empty) gives '' and every goto breaks
+baseURL: process.env.BASE_URL || 'http://localhost:3000',  // ✔ || also replaces an empty string
+```
+
+`process.env.BASE_URL` has the type `string | undefined` [TS]: `undefined` when the variable isn't set anywhere.
+
+**Recommended way.** Read variables only in `playwright.config.ts`, give each a safe default, commit `.env.example`, never `.env`. Secrets (later) get no default: the run should stop with a clear message if one is missing.
+
+**Alternatives, and what goes wrong:**
+
+- Hard-coded `baseURL: 'http://localhost:3000'`: simplest, no package, but changing the address means editing code, and everyone (CI too) is stuck with one value.
+- Node's built-in `process.loadEnvFile('.env')` (Node 20.12+): no package, but it **throws** when `.env` is missing, so CI needs an extra check around it.
+- `process.env` read inside tests or page objects: settings spread across files; one place (the config) is easier to find and to default.
+- One config file per environment (`playwright.staging.config.ts`): duplicates the whole config for one changed value.
+
+**When an alternative is OK.** Hard-coded is fine for one local app with one address, which was us until Week 2 Day 3.
+
+**Interview answer.** "Environment-specific settings like the base URL come from environment variables, loaded from a gitignored .env locally and set by the pipeline in CI, with a safe default in the config. A committed .env.example documents every variable, so secrets never reach the repo."
+
+**Advanced, later:** CI sets `BASE_URL` per job (Week 9); secrets from GitHub Actions secrets; validating required variables at config load; `webServer` skipped when `BASE_URL` points at a deployed app.
+
+**C#:** `appsettings.json` + `appsettings.{Environment}.json` + environment variables through `IConfiguration`, or `.runsettings` parameters (`TestContext.Parameters`). ⚠ Watch out: in .NET, environment variables usually override the JSON files, like our order; but .NET has no `.env` convention built in, and `appsettings.json` is normally committed, so secrets go in user secrets instead.

@@ -16,6 +16,7 @@ Needs Node 24 and Git. Full setup from a new machine, with every step explained:
 git clone https://github.com/alan-Khadir/playwright-typescript-playground.git   # copy the repo to your PC
 cd playwright-typescript-playground                                               # go into the repo folder
 npm ci                                                                            # install the exact package versions from package-lock.json
+Copy-Item .env.example .env                                                       # optional: your own settings, e.g. BASE_URL (gitignored)
 npx playwright install chromium                                                   # download the browser the tests use
 npm test                                                                          # start the app and run every test
 npx playwright show-report                                                        # open the HTML report of the last run
@@ -28,6 +29,7 @@ Run from the repo root.
 | Command                | What it does                                                     |
 | ---------------------- | ---------------------------------------------------------------- |
 | `npm test`             | Runs all tests (Playwright starts the app automatically).        |
+| `npm run test:smoke`   | Runs only the `@smoke` tests (plus the sign-in setup).           |
 | `npm run test:ui`      | Opens Playwright UI mode to run and debug tests step by step.    |
 | `npm run lint`         | ESLint: bad practice and likely bugs. Warnings fail too.         |
 | `npm run typecheck`    | TypeScript type check (`tsc --noEmit`).                          |

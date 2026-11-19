@@ -4,7 +4,7 @@
 // Dark mode: the toggle adds class "dark-mode" to <html>; checked before and after.
 import { test, expect } from '../../fixtures';
 
-test.describe('Home navigation', () => {
+test.describe('Home navigation', { tag: '@regression' }, () => {
   test('Login link opens the sign-in page', async ({
     page,
     homePage,
@@ -45,7 +45,7 @@ test.describe('Home navigation', () => {
   });
 });
 
-test.describe('Dark mode', () => {
+test.describe('Dark mode', { tag: '@regression' }, () => {
   test('Toggle dark mode button switches the page to dark mode', async ({
     homePage,
   }) => {

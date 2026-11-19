@@ -8,6 +8,7 @@ Folders are created when the first file needs them, so this grows week by week.
 
 ```
 playwright/.auth/     saved sign-in state (user.json). Gitignored: written by every run, never committed.
+.env.example          every setting from an environment variable, with a safe sample value. Copy to .env (gitignored).
 webapp/               the app under test. Never changed to make a test pass.
 docs/                 setup-guide.md, architecture.md
   learning/           concepts.md (how things work), walkthroughs.md (our files, line by line)
@@ -252,6 +253,30 @@ Source: [Fixtures](https://playwright.dev/docs/test-fixtures).
 - Every browser project must have `storageState` and `dependencies: ['setup']`.
 
 Why it works this way: [concepts: Auth and storage state](learning/concepts.md#auth-and-storage-state-week-2-day-2). Source: [Authentication](https://playwright.dev/docs/auth).
+
+### Tags
+
+- `@smoke` = "is the app basically alive?": a few fast tests on the paths the app is useless without. From Week 9, CI runs only these on every PR; until then CI runs everything.
+- `@regression` = everything. Every test has it, set once on its `test.describe`: `test.describe('Sign in', { tag: '@regression' }, () => {`. From Week 9 it runs nightly on all browsers.
+- **To decide on smoke, ask: "If only this test failed, would we block the merge?"** Yes → candidate for smoke. No → regression only.
+- A smoke test also needs both: (1) it covers a core path (sign in, the dashboard loads its topics, a topic opens), and (2) it's fast, with no slow setup. Aim for a handful; smoke must stay under a minute as the suite grows. Today: 3 tests.
+- `@smoke` goes on the test itself (`test('valid user reaches the dashboard', { tag: '@smoke' }, async (...)`); it adds to the describe's `@regression`.
+- Not smoke: link-by-link navigation, error messages, UI toggles (dark mode), edge cases. All of these are in regression.
+- `auth.setup.ts` is never tagged: `--grep` brings it along as a dependency.
+- New tags (e.g. `@visual`, `@slow`) only when a run needs to exclude or pick them out.
+- Run smoke with `npm run test:smoke`. Typing the tag in PowerShell needs quotes: `npx playwright test --grep '@smoke'`.
+
+Why it works this way: [concepts: Tags](learning/concepts.md#tags). Source: [Tag tests](https://playwright.dev/docs/test-annotations#tag-tests).
+
+### Environment variables
+
+- Settings that change per machine or environment come from environment variables, read only in `playwright.config.ts`. Today: `BASE_URL`.
+- Every variable has a safe default in the config (`process.env.BASE_URL || 'http://localhost:3000'`), so a run with no `.env` (CI) works.
+- `.env` is personal and gitignored: never commit it. `.env.example` is committed and lists every variable with a safe sample value. A new variable is added to both in the same commit.
+- Order: a variable set in the shell or by CI → `.env` → the config default.
+- Tests and page objects never read `process.env`; only the config does.
+
+Why it works this way: [concepts: Environment variables and .env](learning/concepts.md#environment-variables-and-env). Source: [Passing environment variables](https://playwright.dev/docs/test-parameterize#passing-environment-variables).
 
 ### Naming
 
