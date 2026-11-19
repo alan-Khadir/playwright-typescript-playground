@@ -14,6 +14,7 @@ Contents:
 - [NavBar and the dark mode test](#navbar-and-the-dark-mode-test) (`tests/components/NavBar.ts`, `tests/pages/HomePage.ts`, `tests/specs/home/home.spec.ts`) (Week 2 Day 1)
 - [Auth setup and the dashboard tests](#auth-setup-and-the-dashboard-tests) (`tests/auth.setup.ts`, `playwright.config.ts`, `tests/pages/DashboardPage.ts`, `tests/specs/dashboard/dashboard.spec.ts`) (Week 2 Day 2)
 - [Dashboard search and TopicLayout](#dashboard-search-and-topiclayout-week-2-day-3) (`tests/pages/DashboardPage.ts`, `tests/components/TopicLayout.ts`, `tests/fixtures/index.ts`, `tests/specs/dashboard/dashboard.spec.ts`) (Week 2 Day 3)
+- [Tags and BASE_URL](#tags-and-base_url-week-2-day-3-part-2) (`playwright.config.ts`, `.env.example`, the three specs) (Week 2 Day 3, part 2)
 
 ---
 
@@ -679,3 +680,64 @@ test('opening a topic shows a loader, then the topic', async ({
 - No count check before `openTopic`: `click()` already waits for the card.
 - `toBeVisible` → `toBeHidden` [PW]: the loader appears, then goes. No `waitForTimeout`: `toBeHidden` moves on as soon as the 1.2 s loader is gone.
 - `toHaveText('Space Exploration')` (one string: one `h1`): we landed on the topic we clicked. `toBeVisible()` would pass on any topic.
+
+## Tags and BASE_URL (Week 2 Day 3, part 2)
+
+Files: `playwright.config.ts` (top of the file and `baseURL`), `.env.example`, and the tag lines in the three specs. Concepts behind them: [concepts: Tags and environment variables](concepts.md#tags-and-environment-variables-week-2-day-3).
+
+### playwright.config.ts: loading .env
+
+```ts
+import path from 'path';
+import dotenv from 'dotenv';
+
+dotenv.config({ path: path.resolve(__dirname, '.env'), quiet: true });
+```
+
+- `import path from 'path'` [Node]: Node's tool for building file paths. Same as in `auth.setup.ts`.
+- `import dotenv from 'dotenv'` [Node-npm]: the package added with `npm install --save-dev dotenv`.
+- `dotenv.config({ ... })` [Node-npm]: runs once, when Playwright loads the config, before any test. Reads `.env` and copies each `NAME=value` line into `process.env`. It never overwrites a variable that's already set (shell or CI wins).
+- `path.resolve(__dirname, '.env')` [Node]: `__dirname` = the folder this file is in (the repo root). ✘ Without it, dotenv looks in the folder you ran the command from, so a run from `tests\` would miss `.env`. ✔ With it, `.env` is always the one next to the config.
+- `quiet: true` [Node-npm]: dotenv 17+ prints `◇ injected env (1) from .env` on every load, and Playwright loads the config in each worker.
+- No `.env` (CI): dotenv returns an error object instead of throwing. Nothing reads it, so the run carries on with the defaults.
+
+### playwright.config.ts: baseURL
+
+```ts
+  use: {
+    baseURL: process.env.BASE_URL || 'http://localhost:3000',
+```
+
+- `process.env.BASE_URL` [Node, type `string | undefined` TS]: the value from the shell, CI or `.env`; `undefined` if none set it.
+- `|| 'http://localhost:3000'` [JS]: used when the left side is `undefined` **or** empty (`BASE_URL=`). `??` would let an empty string through.
+- Every `goto('/html/...')` and `toHaveURL('/html/...')` is joined to this value. Proof it's read: `BASE_URL=http://localhost:3003` in `.env` → setup fails with `page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:3003/html/signin.html`.
+- `webServer` is unchanged: it always starts the local app on port 3000.
+
+### .env.example
+
+```ini
+# Settings for running the tests. Copy this file to .env (git ignores .env) and
+# change values there for your machine. Every value has a default in
+# playwright.config.ts, so .env is optional: CI runs without one.
+
+# Where the app under test answers. Default: http://localhost:3000
+BASE_URL=http://localhost:3000
+```
+
+- Committed, never read by code: it tells a newcomer which settings exist. `.gitignore` has `.env`, `.env.*` and `!.env.example` (`!` = "except this one").
+- The sample value equals the default, so copying it changes nothing until you edit it.
+
+### The tag lines (sign-in.spec.ts)
+
+```ts
+test.describe('Sign in', { tag: '@regression' }, () => {
+  test(
+    'valid user reaches the dashboard',
+    { tag: '@smoke' },
+    async ({ page, signInPage, dashboardPage }) => {
+```
+
+- `{ tag: '@regression' }` [PW] on the describe: both sign-in tests get it.
+- `{ tag: '@smoke' }` [PW] on the test: adds `@smoke`; this test now has both tags.
+- Prettier split the test line over several lines because it got too long; the meaning is the same.
+- `home.spec.ts` and `dashboard.spec.ts` follow the same pattern: `@regression` on each describe (4 in all), `@smoke` on "signed-in user sees the topic grid" and "opening a topic shows a loader, then the topic".
