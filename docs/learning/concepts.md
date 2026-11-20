@@ -708,7 +708,8 @@ On demand: only fixtures a test names are built ("setup only the ones needed by 
 5. **When OK:** `beforeEach` for a shared STEP in one file (e.g. `await homePage.goto()`); `new` in a throwaway experiment.
 6. **Interview:** "Fixtures are Playwright's dependency injection: each test names what it needs, Playwright builds it before and cleans up after, only for tests that ask. We expose every page object as a fixture with test.extend, so specs never construct anything and setup lives in one file."
 
-- **Later:** worker-scoped fixtures, `{ auto: true }`, fixture options, `mergeTests`.
+- **Scope** (Week 2 Day 5): test scope (the default, all of ours): built fresh for each test that asks for it, thrown away after. Worker scope (`[fn, { scope: 'worker' }]`): built once per worker (one of the parallel processes running tests) and shared by its tests; only for things that don't hold a tab, e.g. one test account per worker. Page objects can't be worker-scoped: they're built from `page`, which is per test. [Docs](https://playwright.dev/docs/test-fixtures#worker-scoped-fixtures)
+- **Later:** `{ auto: true }` (Week 8), fixture options, `mergeTests`.
 
 ### Fixtures: questions that came up
 
@@ -764,6 +765,7 @@ Docs: [Page object models](https://playwright.dev/docs/pom). Plan rule: composit
   - `toContainClass('dark-mode')` (Playwright 1.52+): `dark-mode` must be ONE OF the classes.
   - Example: `<html class="dark-mode large-text">` ✘ `toHaveClass('dark-mode')` fails / ✔ `toContainClass('dark-mode')` passes.
   - We use `toHaveClass` because `<html>` only ever has that one class today; if the app adds another, switch to `toContainClass`.
+- **`toHaveCSS('color', 'rgb(…)')`** checks one computed style value. Not used: the class is what our app toggles, so `toHaveClass` checks the cause; exact colours are brittle.
 - **Check the start state first:** `await expect(homePage.htmlElement).not.toHaveClass('dark-mode')` before the click. It proves the click is what adds the class. Without it, a page that STARTED dark (e.g. leftover `tp_dark_mode` in localStorage) plus a button that does nothing would still pass the last check. With it, the test fails at the first line and says why. (Alan caught that "would pass on a page that was already dark" alone is wrong: the toggle would make it light and the last check would fail.) Each test gets a fresh browser context (empty localStorage), so the page always starts light.
 - **Finding role and name in Chrome:** right-click → Inspect → Accessibility tab → Computed properties: Role `button`, Name `"Toggle dark mode"` (from `aria-label`; the 🌙 contents are crossed out because aria-label wins). "Show accessibility tree" switches the Elements view to roles; turn it off to see HTML again.
 
@@ -882,6 +884,7 @@ A **setup project** + `dependencies` + `storageState` in the config (what we did
 - **Why `expect` before saving?** It makes setup wait until sign-in has really finished. Saving earlier could store a signed-out state; setup would pass and the dashboard tests would fail with a confusing error.
 - **Why `.setup.ts` and not `-setup.ts`?** The setup project's `testMatch: /.*\.setup\.ts/` only matches names ending in `.setup.ts`. With a dash, setup silently doesn't run (we saw 6 tests instead of 7).
 - **Why does the signed-out dashboard test sit in its own `describe`?** `test.use` applies to its group: the `describe` it's in, or the whole file if it's at the top. The describe keeps the empty state on the signed-out test only. ✘ With `test.use({ storageState: { cookies: [], origins: [] } })` at the top of `dashboard.spec.ts`, the signed-in test would also start signed out, be sent to sign in, and fail on `toHaveCount(4)`. (Week 2 Day 3)
+- **Signed-in tests land on `signin.html?redirect=dashboard` (Week 2 Day 5 drill).** Stale `user.json`. localStorage belongs to one **origin** (scheme + host + port), so a file saved for `http://127.0.0.1:3000` gives nothing on `http://localhost:3000`. Normally setup rebuilds the file every run; `--no-deps` skips setup, so the old file is used. Fix: run without `--no-deps`. ✘ Not: sign in in every test, retries, waits, hand-editing or committing the file.
 
 ---
 
