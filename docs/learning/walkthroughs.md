@@ -15,6 +15,9 @@ Contents:
 - [Auth setup and the dashboard tests](#auth-setup-and-the-dashboard-tests) (`tests/auth.setup.ts`, `playwright.config.ts`, `tests/pages/DashboardPage.ts`, `tests/specs/dashboard/dashboard.spec.ts`) (Week 2 Day 2)
 - [Dashboard search and TopicLayout](#dashboard-search-and-topiclayout-week-2-day-3) (`tests/pages/DashboardPage.ts`, `tests/components/TopicLayout.ts`, `tests/fixtures/index.ts`, `tests/specs/dashboard/dashboard.spec.ts`) (Week 2 Day 3)
 - [Tags and BASE_URL](#tags-and-base_url-week-2-day-3-part-2) (`playwright.config.ts`, `.env.example`, the three specs) (Week 2 Day 3, part 2)
+- [CreateAccountPage](#createaccountpage) (`tests/pages/CreateAccountPage.ts`) (Week 3 Day 1)
+- [Toast](#toast) (`tests/components/Toast.ts`) (Week 3 Day 1)
+- [Create account spec](#create-account-spec) (`tests/specs/create-account/create-account.spec.ts`) (Week 3 Day 1)
 
 ---
 
@@ -741,3 +744,162 @@ test.describe('Sign in', { tag: '@regression' }, () => {
 - `{ tag: '@smoke' }` [PW] on the test: adds `@smoke`; this test now has both tags.
 - Prettier split the test line over several lines because it got too long; the meaning is the same.
 - `home.spec.ts` and `dashboard.spec.ts` follow the same pattern: `@regression` on each describe (4 in all), `@smoke` on "signed-in user sees the topic grid" and "opening a topic shows a loader, then the topic".
+
+---
+
+## CreateAccountPage
+
+`tests/pages/CreateAccountPage.ts` (Week 3 Day 1). The create account form, its messages and the toast. Why it works: [concepts: Create account form](concepts.md#create-account-form-week-3-day-1).
+
+### The data type
+
+```ts
+export type AccountDetails = {
+  fullName: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+  acceptTerms: boolean;
+};
+```
+
+- `export type AccountDetails = {...}` [TS]: a type alias: the shape of the form's data. `export` so specs (and Day 2's test data) can use it. Lives above the class until 2+ files need it.
+- Property names describe the **value** (`fullName`, `acceptTerms`), not the element (`fullNameInput`, `termsCheckbox` are the locators).
+- `acceptTerms: boolean` [TS]: a checkbox has two states; `true` / `false` only, so `'yes'` is a type error.
+
+### Properties and constructor
+
+```ts
+export class CreateAccountPage {
+  readonly toast: Toast;
+  readonly heading: Locator;
+  readonly fullNameInput: Locator;
+  ...
+  readonly termsCheckbox: Locator;
+  readonly createAccountButton: Locator;
+  readonly successMessage: Locator;
+  readonly fullNameError: Locator;
+  readonly emailError: Locator;
+  readonly passwordError: Locator;
+  readonly termsError: Locator;
+
+  constructor(page: Page) {
+    this.toast = new Toast(page);
+    this.heading = page.getByRole('heading', { name: 'Create Account' });
+    this.fullNameInput = page.getByLabel('Full Name');
+    this.emailInput = page.getByLabel('Email');
+    this.passwordInput = page.getByLabel('Password', { exact: true });
+    this.confirmPasswordInput = page.getByLabel('Confirm Password');
+    this.termsCheckbox = page.getByRole('checkbox', { name: 'I agree to the Terms & Conditions' });
+    this.createAccountButton = page.getByRole('button', { name: 'Create Account' });
+    this.successMessage = page.getByRole('main').getByText('Account created successfully!');
+    this.fullNameError = page.getByRole('main').getByText('Name must be at least 2 characters');
+    ... emailError, passwordError, termsError: same shape, their own text
+  }
+```
+
+- `readonly toast: Toast` + `new Toast(page)` [OURS]: composition, like `homePage.navBar`. The page object builds its component, so the fixture stays `new CreateAccountPage(page)`.
+- `constructor(page: Page)` [TS]: plain input, not stored: no method uses `this.page`.
+- `getByLabel('Password', { exact: true })` [PW]: getByLabel matches part of the label, case-insensitive, so `'Password'` also matched "Confirm Password" (strict mode violation). `exact: true` matches the whole label only. ✘ `.first()` depends on order.
+- `getByRole('checkbox', { name: ... })` [PW]: the checkbox's name comes from its label text.
+- `successMessage` [PW]: `#create-account-message` is a plain `div` (role generic), so `getByText`. The toast shows the same text outside `main`, so scoping to `main` keeps it to one element.
+- The four errors [PW]: each is a `<span role="alert">` inside `main`. An alert takes no name from its text, so `getByRole('alert', { name })` would find nothing; the text is fixed and unique, so `getByText`. Text in the locator → the spec uses `toBeVisible()`.
+- No `confirmPasswordError`: no test uses it yet.
+
+### createAccount()
+
+```ts
+async createAccount(details: Partial<AccountDetails>): Promise<void> {
+  if (details.fullName !== undefined) {
+    await this.fullNameInput.fill(details.fullName);
+  }
+  ... same for email, password, confirmPassword
+  if (details.acceptTerms !== undefined) {
+    await this.termsCheckbox.setChecked(details.acceptTerms);
+  }
+  await this.createAccountButton.click();
+}
+```
+
+- One intent method for the whole form [OURS]: the user's goal is "create an account", whatever they type.
+- `details: Partial<AccountDetails>` [TS]: one object, every field optional; a test gives only what it needs (`{}` for an empty form).
+- `if (details.x !== undefined)` [JS]: skip fields left out; also narrows `string | undefined` to `string` for `fill()`. `''` and `false` are not `undefined`, so they are still used.
+- `setChecked(details.acceptTerms)` [PW]: `true` ticks, `false` unticks, clicking only if needed.
+- `click()` [PW]: always submits, so a test of a blocked submit uses the same method.
+
+## Toast
+
+`tests/components/Toast.ts` (Week 3 Day 1).
+
+```ts
+export class Toast {
+  readonly message: Locator;
+
+  constructor(page: Page) {
+    this.message = page.getByTestId('toast-notification');
+  }
+}
+```
+
+- What it is: a **component**: the short-lived pop-up (~3 s) in `#toast-container`, a sibling of `main` under `body`. The app shows it on many screens (create account, sign in, dashboard guard, logout), so it's a component, held by page objects as `readonly toast: Toast`. Today only `CreateAccountPage` holds it.
+- `message` [OURS]: neutral name. The app's one function `showToast(message, type)` is called ~20 times with success, error or info text; the spec decides which text is right.
+- `getByTestId('toast-notification')` [PW]: finds `data-testid="toast-notification"`. Not `getByRole('alert')`: on create account it matches 6 elements (5 field errors + the toast), and alerts have no name to tell them apart. The full reasoning, and the accessibility fix a real team would ask for: [concepts](concepts.md#finding-the-field-errors-and-the-toast), [Asking developers for accessible locators](concepts.md#asking-developers-for-accessible-locators-week-3-day-1).
+- `constructor(page: Page)` [TS]: plain input, not stored.
+
+## Create account spec
+
+`tests/specs/create-account/create-account.spec.ts` (Week 3 Day 1). Same imports, `@regression` describe and signed-out `test.use` as the other specs.
+
+```ts
+test(
+  'valid details create the account and show a success message',
+  { tag: '@smoke' },
+  async ({ page, createAccountPage, homePage, signInPage }) => {
+    await homePage.goto();
+    await homePage.navBar.openCreateAccount();
+    await createAccountPage.createAccount({
+      fullName: 'fred fredy',
+      email: 'fred@test.com',
+      password: 'Password12345',
+      confirmPassword: 'Password12345',
+      acceptTerms: true,
+    });
+
+    await expect(createAccountPage.toast.message).toContainText(
+      'Account created successfully!',
+    );
+    await expect(createAccountPage.successMessage).toBeVisible();
+    await expect(page).toHaveURL('/html/signin.html');
+    await expect(signInPage.heading).toBeVisible();
+  },
+);
+```
+
+- Starts on Home and uses the nav, like a user. Signed out (the describe's `test.use`), because the form is for new users.
+- `toast.message` + `toContainText` [PW]: the locator finds by test id, so the text must be checked. First assertion straight after the click: the toast lasts ~3 s and the redirect comes at 2 s. Checked here only, once.
+- `successMessage` + `toBeVisible()` [PW]: the text is in the locator.
+- `toHaveURL('/html/signin.html')` [PW]: the app redirects after 2 s; the assertion retries until then. The title says "create the account", but the app doesn't save it; we check what the app shows.
+
+```ts
+test('an empty form shows an error for each required field', async ({ homePage, createAccountPage }) => {
+  ...
+  await createAccountPage.createAccount({});
+  await expect(createAccountPage.fullNameError).toBeVisible();
+  await expect(createAccountPage.emailError).toBeVisible();
+  await expect(createAccountPage.passwordError).toBeVisible();
+  await expect(createAccountPage.termsError).toBeVisible();
+});
+```
+
+- `createAccount({})` [OURS]: no fields given, so it only clicks Create Account. No confirm error: two empty passwords match.
+
+The other three follow one pattern: every field valid except one, then one assertion.
+
+| Test                                               | The one invalid field                      | Asserts         |
+| -------------------------------------------------- | ------------------------------------------ | --------------- |
+| `'an invalid email format shows an email error'`   | `email: 'fred.test.com'` (no `@`)          | `emailError`    |
+| `'a short password shows a password length error'` | `password` and `confirmPassword: 'Pass12'` | `passwordError` |
+| `'terms not checked shows a terms error'`          | `acceptTerms: false`                       | `termsError`    |
+
+- Why one invalid field: a failure then names one rule ([concepts](concepts.md#one-invalid-field-per-test)).
+- The valid details repeat in every test; Day 2 replaces them with typed generated test data.
