@@ -1070,6 +1070,36 @@ npx playwright test --grep '@smoke' --list    # 5. Check: setup + 3 smoke tests,
 npm run test:smoke                            # 6. Check: 4 passed
 ```
 
+## Step 17. Create account tests and the Toast component (Week 3 Day 1)
+
+**Where:** VS Code terminal, repo root `PS C:\git-personal\playwright-typescript-playground>`.
+
+```powershell
+git switch main                          # go to the main branch
+git pull                                 # bring down the latest main from GitHub
+git switch -c feat/create-account        # create the branch AND switch to it
+git branch --show-current                # Check: prints feat/create-account
+```
+
+| File                                                | What it is                                                                                                 |
+| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `tests/components/Toast.ts`                         | New component: the toast message, found by test id.                                                        |
+| `tests/pages/CreateAccountPage.ts`                  | `AccountDetails` type, form fields, `createAccount(details)`, success message, four field errors, `toast`. |
+| `tests/specs/create-account/create-account.spec.ts` | New: 5 signed-out tests (success + 4 validation).                                                          |
+| `playwright.config.ts`                              | `screenshot: 'only-on-failure'`: failed tests get a screenshot in the HTML report.                         |
+
+Rules: `docs/architecture.md`, "Locators" and "Naming".
+
+**Check (fastest first):**
+
+```powershell
+npm run format:check                              # 1. Prettier: "All matched files use Prettier code style!"
+npm run lint                                      # 2. ESLint: no output = no problems
+npm run typecheck                                 # 3. tsc: no output = no type errors
+npm test                                          # 4. 17 passed (1 setup + 16 tests)
+npx playwright test tests/specs/create-account    # 5. Check: 6 passed (setup + 5 create-account tests)
+```
+
 ## Run, debug and report commands
 
 **Where:** VS Code terminal, in the repo root.
@@ -1268,3 +1298,5 @@ git log --oneline
 | `npx playwright test --grep @smoke` in PowerShell: `The variable '$smoke' cannot be retrieved because it has not been set.`                                                                     | PowerShell reads `@name` as splatting the variable `$name`, so Playwright never runs.                                                                                                                                 | Quote the tag: `--grep '@smoke'` (works in bash too), or use `npm run test:smoke`. (Week 2 Day 3)                                                                                                                                                                                                                                                                                                                                  |
 | Every test fails in setup: `page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:3003/html/signin.html`                                                                                   | `BASE_URL` in `.env` (or set in the shell) points where no app runs; `webServer` always starts the app on 3000.                                                                                                       | Fix or delete the `BASE_URL` line in `.env`; for a shell value, `Remove-Item Env:BASE_URL`. (Week 2 Day 3)                                                                                                                                                                                                                                                                                                                         |
 | Signed-in tests fail; the trace or error context shows `signin.html?redirect=dashboard`                                                                                                         | `playwright/.auth/user.json` is stale (saved for another origin, e.g. `127.0.0.1` instead of `localhost`) and `--no-deps` skipped setup, so it wasn't rebuilt                                                         | Run without `--no-deps` (`npm test`). Never hand-edit or commit the file. (Week 2 Day 5)                                                                                                                                                                                                                                                                                                                                           |
+| `strict mode violation: getByRole('alert') resolved to 6 elements` on the create account page                                                                                                   | The 5 field-error spans are `role="alert"` too (inside `main`), plus the toast outside it                                                                                                                             | Use the toast's test id: `getByTestId('toast-notification')` (`Toast.message`). (Week 3 Day 1)                                                                                                                                                                                                                                                                                                                                     |
+| `getByRole('alert', { name: '...' })` times out: element(s) not found                                                                                                                           | An alert takes no accessible name from its text (DevTools → Accessibility: `Name: ""`)                                                                                                                                | Find it by its text: `page.getByRole('main').getByText('...')`. (Week 3 Day 1)                                                                                                                                                                                                                                                                                                                                                     |

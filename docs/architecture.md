@@ -24,17 +24,19 @@ tests/
   components/         parts used on many pages, included by page objects as a property (composition)
     NavBar.ts         the Main navigation: its links, the dark mode button, and their actions
     TopicLayout.ts    the layout all 10 topic pages share; today the loader and the title (h1)
+    Toast.ts          the short-lived pop-up message outside main, on many screens
   fixtures/index.ts   hands each test its page objects by name ({ homePage }); specs import test and expect from here
   auth.setup.ts       setup project: signs in once, saves playwright/.auth/user.json (see "Auth")
   specs/<app area>/   the tests and every expect, one folder per screen the tests start on
     sign-in/sign-in.spec.ts
     home/home.spec.ts
     dashboard/dashboard.spec.ts
+    create-account/create-account.spec.ts
   pages/              one page object per screen: locators and actions, no expect
     SignInPage.ts  HomePage.ts  DashboardPage.ts  CreateAccountPage.ts  TaskBoardPage.ts
 ```
 
-A page object is created the first time a test touches that screen, with only what that test uses (e.g. `CreateAccountPage` has just `heading` until Week 3). A component (`tests/components/`) is a part that appears on 2+ screens. `NavBar` was added in Week 2 Day 1: the Main navigation is on every page, and the plan asks for it then. Today only `HomePage` includes it; other page objects add `readonly navBar` when a test of theirs needs the nav. `TopicLayout` (Week 2 Day 3) is the layout shared by the 10 topic pages; until topic page objects exist (Week 3, in `tests/pages/topics/`, each holding `readonly layout: TopicLayout`), tests get it from its own fixture.
+A page object is created the first time a test touches that screen, with only what that test uses (e.g. `CreateAccountPage` had just `heading` until Week 3 Day 1). A component (`tests/components/`) is a part that appears on 2+ screens. `NavBar` was added in Week 2 Day 1: the Main navigation is on every page, and the plan asks for it then. Today only `HomePage` includes it; other page objects add `readonly navBar` when a test of theirs needs the nav. `TopicLayout` (Week 2 Day 3) is the layout shared by the 10 topic pages; until topic page objects exist (Week 3, in `tests/pages/topics/`, each holding `readonly layout: TopicLayout`), tests get it from its own fixture. `Toast` (Week 3 Day 1) is the pop-up message; `CreateAccountPage` holds it as `readonly toast`, and other page objects add it when a test of theirs checks a toast.
 
 ## Adding a test
 
@@ -67,7 +69,7 @@ page.getByLabel('Email');
 - `getByRole` for things you interact with (buttons, links, inputs); `getByText` for plain text (div, span, p).
 - Form fields: `getByLabel`, as the Locators page recommends for form controls. It reads the same for every field, and it fails if the label is missing or no longer linked to the field.
 - CSS only when no user-facing locator can exist. Our one case: the page's root element, `page.locator('html')` (`HomePage.htmlElement`), which has no role, label or text. ✘ `page.locator('.primary-nav button')` (a role and name exist) / ✔ `page.locator('html')`. Source: [Locators: CSS or XPath](https://playwright.dev/docs/locators#locate-by-css-or-xpath).
-- Test IDs are stable but not user-facing: they still pass if the label is missing. Use them only when there is no stable text or role.
+- Test IDs are stable but not user-facing: they still pass if the label is missing. Use them only when no user-facing locator is unique. Our case: the toast, `getByTestId('toast-notification')`: 6 elements have role `alert` and alerts have no name. Before choosing a test id, check whether it's an accessibility gap worth raising: [concepts: Asking developers for accessible locators](learning/concepts.md#asking-developers-for-accessible-locators-week-3-day-1).
 
 - `getByRole` searches the role the browser gives each element, not the HTML tag (e.g. an email input is a `textbox`; a `div` is `generic`, so use `getByText`). Full role table and how to find roles on any page: [concepts: ARIA and roles](learning/concepts.md#aria-roles-and-the-accessibility-tree-week-1-day-3). When the W3C table and the browser disagree, trust Playwright's page snapshot.
 
@@ -299,16 +301,18 @@ Why it works this way: [concepts: Environment variables and .env](learning/conce
 
 ### Naming
 
-| What                               | Pattern                                                               | Examples                                                                                    |
-| ---------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| Open this page directly by its URL | `goto()` (one word, like Playwright's `page.goto()`)                  | `homePage.goto()`, `signInPage.goto()`                                                      |
-| Reach another page through the UI  | `open` + destination page object name without `Page`                  | `openSignIn()` → `SignInPage`, `openCreateAccount()`, `openTaskBoard()`, `openTopic(title)` |
-| Any other user action              | the user's verb                                                       | `signIn(email, password)`, `toggleDarkMode()`                                               |
-| Locator properties                 | what it is + kind of element; links use their text                    | `emailInput`, `signInButton`, `loginLink`, `darkModeButton`, `heading`                      |
-| Page object classes and files      | PascalCase + `Page`, file named the same                              | `CreateAccountPage` in `CreateAccountPage.ts`                                               |
-| Components (part of a screen)      | PascalCase, no `Page` (you can't open it), in `tests/components/`     | `NavBar` in `NavBar.ts`; property on the page object: `navBar`                              |
-| Methods                            | camelCase (small first letter)                                        | `toggleDarkMode()`, not `ToggleDarkMode()`                                                  |
-| Test titles                        | what the user does + expected result, lowercase except on-screen text | `'Login link opens the sign-in page'`, `'wrong password shows the error'`                   |
+| What                               | Pattern                                                                                                                                         | Examples                                                                                     |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Open this page directly by its URL | `goto()` (one word, like Playwright's `page.goto()`)                                                                                            | `homePage.goto()`, `signInPage.goto()`                                                       |
+| Reach another page through the UI  | `open` + destination page object name without `Page`                                                                                            | `openSignIn()` → `SignInPage`, `openCreateAccount()`, `openTaskBoard()`, `openTopic(title)`  |
+| Any other user action              | the user's verb                                                                                                                                 | `signIn(email, password)`, `toggleDarkMode()`                                                |
+| Locator properties                 | what it is + kind of element; links use their text                                                                                              | `emailInput`, `signInButton`, `loginLink`, `darkModeButton`, `heading`                       |
+| Data type properties               | the value, not the element                                                                                                                      | `acceptTerms: boolean` (its locator: `termsCheckbox`), `fullName` (locator: `fullNameInput`) |
+| Shared component locators          | what it is, not what today's text says                                                                                                          | `toast.message`, not `toast.successMessage`                                                  |
+| Page object classes and files      | PascalCase + `Page`, file named the same                                                                                                        | `CreateAccountPage` in `CreateAccountPage.ts`                                                |
+| Components (part of a screen)      | PascalCase, no `Page` (you can't open it), in `tests/components/`                                                                               | `NavBar` in `NavBar.ts`; property on the page object: `navBar`                               |
+| Methods                            | camelCase (small first letter)                                                                                                                  | `toggleDarkMode()`, not `ToggleDarkMode()`                                                   |
+| Test titles                        | condition or user action + expected result; name which error; lowercase except on-screen text; no "should"; the describe already names the area | `'Login link opens the sign-in page'`, `'a short password shows a password length error'`    |
 
 Name the user's goal, not the mechanics:
 

@@ -1011,8 +1011,13 @@ await expect(topicLayout.heading).toHaveText('Space Exploration');
 
 ### Seeing a short-lived element
 
-- **DevTools breakpoint:** Sources → `Ctrl+P` `app.js` → `Ctrl+G` 977 (the `await simulateDelay(1200)` line right after the loader is added) → click the line number → reload. The page freezes with the loader on screen; inspect it in Elements. Remove the breakpoint and press F8 to resume. Nothing in `webapp/` changes.
-- **Trace viewer:** `npx playwright test --trace on`, then open the trace from `npx playwright show-report`. Each step has a DOM snapshot you can inspect.
+Loaders and toasts disappear in seconds. Ways to freeze or replay them (nothing in `webapp/` changes):
+
+- **DevTools breakpoint (loader):** Sources → `Ctrl+P` `app.js` → `Ctrl+G` 977 (the `await simulateDelay(1200)` line right after the loader is added) → click the line number → reload. The page freezes with the loader on screen; inspect it in Elements. Remove the breakpoint and press F8 to resume. Nothing in `webapp/` changes.
+- **F8 pause (toast, ~3 s):** DevTools open on Sources, form filled. Click the page's button, then straight away click blank space inside DevTools and press F8, all within ~3 s. F8 only works when focus is in DevTools. The page pauses at the next JavaScript (the timer that hides the toast), so the toast stays; "Paused in debugger" shows. F8 again resumes.
+- **Reliable pause:** in the Console run `setTimeout(() => { debugger; }, 2000);`, then click the button within 2 s; the page freezes 2 s later. Or set a breakpoint on the `showToast(...)` line in `app.js` (Ctrl+F `showToast`) and step with F10.
+- **Trace viewer:** `npx playwright test --trace on` (overrides the config's `trace` for this one run), then `npx playwright show-report` → the test → Traces → click a step → **After** tab = the page just after that step. "Pick locator" tries a locator on that snapshot; or open the snapshot in its own window and use F12.
+- **Failure screenshots:** `screenshot: 'only-on-failure'` in the config (Week 3 Day 1) attaches the page at the moment of failure to the HTML report.
 
 ### Tests that survive content changes (for later)
 
@@ -1124,3 +1129,270 @@ baseURL: process.env.BASE_URL || 'http://localhost:3000',  // ✔ || also replac
 **Advanced, later:** CI sets `BASE_URL` per job (Week 9); secrets from GitHub Actions secrets; validating required variables at config load; `webServer` skipped when `BASE_URL` points at a deployed app.
 
 **C#:** `appsettings.json` + `appsettings.{Environment}.json` + environment variables through `IConfiguration`, or `.runsettings` parameters (`TestContext.Parameters`). ⚠ Watch out: in .NET, environment variables usually override the JSON files, like our order; but .NET has no `.env` convention built in, and `appsettings.json` is normally committed, so secrets go in user secrets instead.
+
+---
+
+## Create account form (Week 3 Day 1)
+
+Our code: [walkthroughs: CreateAccountPage](walkthroughs.md#createaccountpage), [Toast](walkthroughs.md#toast), [create account spec](walkthroughs.md#create-account-spec).
+
+### `Partial<T>` and `!== undefined`
+
+1. **Kind / from:** a **utility type**, TypeScript-only (removed when the code runs).
+2. **What:** `Partial<T>` builds a new type from `T` in which every property is optional, as if each had `?`. Each property's type gains `| undefined`.
+3. **How (our code):**
+   ```ts
+   export type AccountDetails = { fullName: string; email: string; password: string; confirmPassword: string; acceptTerms: boolean };
+   // Partial<AccountDetails> is { fullName?: string; email?: string; ...; acceptTerms?: boolean }
+
+   async createAccount(details: Partial<AccountDetails>): Promise<void> {
+     if (details.email !== undefined) {
+       await this.emailInput.fill(details.email); // inside the if, email is string, not string | undefined
+     }
+     ...
+   }
+   // spec: createAccount({})  createAccount({ email: 'fred.test.com', acceptTerms: true, ... })
+   ```
+4. **Why the `if`:** `fill()` accepts only a `string`. Without the `if`, `npm run typecheck` reports `Argument of type 'string | undefined' is not assignable to parameter of type 'string'.` The `if` **narrows** the type to `string`. Left out = not touched.
+5. **Gotchas:**
+   - `''` is not `undefined`: `email: ''` IS filled (with nothing). That's how to test an empty field while the others are set.
+   - ✘ `if (details.email)` / ✘ `if (details.acceptTerms)`: `''` and `false` are "falsy", so an empty string or `false` would be skipped. ✔ `!== undefined` skips only "left out".
+   - **When not to use Partial:** if every field is always required, take `AccountDetails` itself, so a missing field is a type error.
+6. **One object vs several optional parameters:** both need one `if` per field inside; the difference is at the call.
+   ```ts
+   // ✘ createAccount(undefined, 'fred.test.com', undefined, undefined, true)  order matters, placeholders, unreadable
+   // ✔ createAccount({ email: 'fred.test.com', acceptTerms: true })            named, any left out, order free
+   ```
+   A new field doesn't break existing calls. `AccountDetails` is exported above the class; it moves to a shared types file when 2+ files use it.
+7. **C#:** no built-in `Partial`; closest is an options class with nullable properties (`string? Email`). ⚠ Watch out: a left-out property in TS is `undefined`, not `null`; check `!== undefined`.
+
+Docs: [Utility types: Partial](https://www.typescriptlang.org/docs/handbook/utility-types.html#partialtype), [Narrowing](https://www.typescriptlang.org/docs/handbook/2/narrowing.html).
+
+### `boolean` for a checkbox, and `setChecked`
+
+- **`boolean`** [TS]: the type of JS `true` / `false`. A checkbox has two states; a boolean has two values. C# `bool`.
+- **Data names the value, the page object names the element:**
+  ```ts
+  // AccountDetails (data)         CreateAccountPage (locator)
+  acceptTerms: boolean;            readonly termsCheckbox: Locator;
+  ```
+  ✘ `termsCheckbox: string` (`'yes'` / `'no'`): any text compiles (`'Yes'`, `'y'`), and our first version ticked the box even for `'no'` because it only checked "was something given?". ✔ `acceptTerms: boolean`: `npm run typecheck` rejects `'yes'` (`Type 'string' is not assignable to type 'boolean'.`).
+- **`setChecked(checked)`** [PW]: makes the box match the value: `true` → ticked, `false` → unticked. It clicks only if the state is wrong. `click()` just flips whatever it finds. `check()` / `uncheck()` = `setChecked(true)` / `setChecked(false)`.
+  ```ts
+  if (details.acceptTerms !== undefined) {
+    await this.termsCheckbox.setChecked(details.acceptTerms); // true ticks, false unticks, left out = untouched
+  }
+  ```
+- **In the spec, say `false`:** ✘ leaving `acceptTerms` out relies on the page starting unticked. ✔ `acceptTerms: false` states the condition the title names.
+- **Selenium:** no `setChecked`; you write `if (box.Selected != wanted) box.Click();` yourself.
+
+Docs: [setChecked](https://playwright.dev/docs/api/class-locator#locator-set-checked).
+
+### Finding the field errors and the toast
+
+The page after a failed submit (DevTools → Elements):
+
+```html
+<main>
+  <form id="create-account-form" novalidate>
+    <input type="email" id="new-email" ... />
+    <span class="field-error" id="email-error" role="alert"
+      >Please enter a valid email address</span
+    >
+    ... one span per field, empty until the app fills it
+  </form>
+</main>
+<div id="toast-container">
+  <div
+    role="alert"
+    data-testid="toast-notification"
+    class="toast toast-success"
+  >
+    ✅ Account created successfully! ✕
+  </div>
+</div>
+```
+
+- **6 alerts:** 5 field-error spans inside `main` + the toast outside it. `page.getByRole('alert')` → `strict mode violation: getByRole('alert') resolved to 6 elements`. The accessibility tree hides empty or collapsed parts, so check the Elements tab too before assuming "only one".
+- **An alert has no accessible name from its text** (DevTools → Accessibility: `Name: ""`). Like `status` (see [Accessible name](#accessible-name-where-it-comes-from)): `button`, `link`, `heading`, `checkbox` take their name from their text; `alert` and `status` don't. So ✘ `getByRole('alert', { name: 'Name must be at least 2 characters' })` → "element(s) not found".
+- **Field errors:** fixed, unique text per field → ✔ `page.getByRole('main').getByText('Please enter a valid email address')`. Text in the locator, so the spec uses `toBeVisible()`.
+- **Toast:** no user-facing locator is unique (6 alerts, no names), and the text must stay in the spec because `Toast` is shared. So ✔ `page.getByTestId('toast-notification')`. Rejected:
+  - ✘ `.nth(5)` / `.last()`: depends on the order of elements in the HTML.
+  - ✘ `.filter({ visible: true })`: works only while the field errors are empty.
+  - ✘ `.filter({ hasText: 'Account created...' })` in the component: test text in a shared component; wrong on the Sign In page.
+  - ✘ `page.locator('#toast-container')`: an HTML `id` is a **CSS selector**, ranked below test ids.
+- **Test id vs HTML id:** `data-testid="..."` → `getByTestId()`, added for tests, survives design changes, ranked just above CSS. `id="..."` → `page.locator('#...')` = CSS, last. ⚠ Selenium: `By.Id` feels safe there; in Playwright it's just CSS.
+- **Which assertion:** locator finds by text → `toBeVisible()`. Locator finds by role or test id → check the text: `toContainText('Account created successfully!')` (the toast also holds ✅ and the ✕ close button, so `toHaveText` would compare the whole text). ✘ `toContainClass` checks the `class` attribute, not the text.
+- **Name it `message`, not `successMessage`:** the app calls `showToast(message, type)` about 20 times with `success`, `error` or `info` (sign-in error, dashboard guard, logout...). Same element, only the text changes; the spec decides which text is right.
+- **Short-lived (~3 s):** a web-first assertion straight after the click catches it (it re-checks and passes the first time it's there). Check the toast before the URL: the redirect comes at 2 s.
+
+Docs: [getByTestId](https://playwright.dev/docs/locators#locate-by-test-id), [toContainText](https://playwright.dev/docs/api/class-locatorassertions#locator-assertions-to-contain-text), [Strictness](https://playwright.dev/docs/locators#strictness).
+
+### One invalid field per test
+
+- Each validation test breaks **one** rule; every other field is valid. A pass or a failure then points at exactly one rule.
+- ✘ Short-password test that still had `email: 'fred.test.com'` (copied from the email test): rejected for two reasons, so it can't prove the password rule alone stops it. ✔ `email: 'fred@test.com'`.
+- The form has `novalidate`, so the browser's own checks (`required`, `type="email"`, `minlength="8"`) don't block the submit; only the app's messages appear. Native vs app validation: Week 3 Day 2.
+- Not covered on purpose: name shorter than 2 characters and "Passwords do not match" (same pattern; the name error is already checked in the empty-form test). A data-driven test covers every rule in one table in Week 6.
+- **Interview line:** "Each validation test has one invalid field and everything else valid, so a failure names one rule. For many rules I'd use a data-driven test rather than copy the same test."
+
+---
+
+## Asking developers for accessible locators (Week 3 Day 1)
+
+### 1. What and why
+
+When no user-facing locator can find an element, first ask: **is something missing that a real user needs?** If yes, ask the developers for that accessibility fix. It helps screen-reader and keyboard users, and as a side effect gives you a role or label locator. Only when there is no genuine user need, use (or ask for) a test id.
+
+- **Frame it as accessibility, not "QA needs it".** Accessibility fixes are cheap, help real users, and many companies must meet WCAG ([WCAG 4.1.2 Name, Role, Value](https://www.w3.org/WAI/WCAG22/Understanding/name-role-value.html)). "Make it easier for QA" competes with features and often loses.
+- **Only ask for real fixes.** The first rule of ARIA: use a native HTML element with the meaning built in before adding ARIA attributes ([Using ARIA, rule 1](https://www.w3.org/TR/using-aria/#rule1)). A wrong `role` or a made-up `aria-label` makes the page worse for screen-reader users.
+
+### 2. Good asks, with examples
+
+Each: HTML before (✘), after (✔), and the locator it makes possible.
+
+**a. A clickable `div` → a real button**
+
+```html
+<div class="btn" onclick="save()">Save</div>
+<!-- ✘ role generic: no keyboard, screen reader says "Save" as plain text -->
+<button type="button" onclick="save()">Save</button>
+<!-- ✔ role button, name "Save", works with Tab + Enter -->
+```
+
+Locator: `getByRole('button', { name: 'Save' })`.
+
+**b. An input with no label → a linked `<label>`**
+
+```html
+<span>Email</span><input id="email" />
+<!-- ✘ no accessible name -->
+<label for="email">Email</label><input id="email" type="email" />
+<!-- ✔ name "Email"; clicking the label focuses the field -->
+```
+
+Locator: `getByLabel('Email')`. Our create account form already does this.
+
+**c. An icon-only button → `aria-label`**
+
+```html
+<button>✕</button>
+<!-- ✘ screen reader says "button" or "multiplication x" -->
+<button aria-label="Clear search">✕</button>
+<!-- ✔ name "Clear search" -->
+```
+
+Locator: `getByRole('button', { name: 'Clear search' })`. Our dashboard search already does this.
+
+**d. An image with no `alt` → `alt` text**
+
+```html
+<img src="logo.png" />
+<!-- ✘ screen reader reads the file name -->
+<img src="logo.png" alt="Testing Playground logo" />
+<!-- ✔ -->
+```
+
+Locator: `getByAltText('Testing Playground logo')` or `getByRole('img', { name: 'Testing Playground logo' })`. Our footer logo already has it. A purely decorative image gets `alt=""` (hidden from screen readers): then it correctly has no user-facing locator.
+
+**e. An unnamed section → a named landmark** (our toast)
+
+```html
+<div id="toast-container">
+  <!-- ✘ plain div, hidden from the accessibility tree -->
+  <div id="toast-container" role="region" aria-label="Notifications">
+    <!-- ✔ landmark "Notifications" -->
+  </div>
+</div>
+```
+
+Locator: `getByRole('region', { name: 'Notifications' }).getByRole('alert')`. A `region` only counts as a landmark when it has a name ([MDN: region role](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Roles/region_role), [APG: Landmark regions](https://www.w3.org/WAI/ARIA/apg/practices/landmark-regions/)).
+
+**f. Two landmarks of the same kind → give each a name**
+
+```html
+<nav>...</nav>
+<nav>...</nav>
+<!-- ✘ "navigation", "navigation" -->
+<nav aria-label="Main navigation">
+  <nav aria-label="Topics navigation"><!-- ✔ --></nav>
+</nav>
+```
+
+Locator: `getByRole('navigation', { name: 'Main navigation' })`. Our header already does this.
+
+**g. An error not linked to its field → `aria-describedby`** (our field errors)
+
+```html
+<input id="new-email" type="email" />
+<span id="email-error" role="alert">...</span>
+<!-- ✘ the field doesn't know its error -->
+<input
+  id="new-email"
+  type="email"
+  aria-describedby="email-error"
+  aria-invalid="true"
+/>
+<!-- ✔ -->
+```
+
+A screen reader then reads the error when the user focuses the field. Test: `await expect(createAccountPage.emailInput).toHaveAccessibleDescription('Please enter a valid email address')` ([toHaveAccessibleDescription](https://playwright.dev/docs/api/class-locatorassertions#locator-assertions-to-have-accessible-description), [MDN: aria-describedby](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-describedby)).
+
+### 3. Bad asks (use a test id instead)
+
+```html
+<button aria-label="qa-submit-btn">Create Account</button>
+<!-- ✘ screen reader now says "qa-submit-btn", not what's on screen -->
+<div role="button">Total: 5</div>
+<!-- ✘ lies: it isn't clickable -->
+<tr aria-label="row-17">
+  ...
+</tr>
+<!-- ✘ invented names only to tell repeated rows apart -->
+```
+
+✔ For these, a test id (`data-testid`) is the honest choice: invisible to users, stable, made for tests. For repeated rows, first try filtering by their content (`filter({ hasText })`, `filter({ has })`).
+
+### 4. Which locator each element can genuinely have
+
+| Element                      | Locators it can have                                                                               |
+| ---------------------------- | -------------------------------------------------------------------------------------------------- |
+| button, link                 | `getByRole` + name (its text, or `aria-label` if icon-only)                                        |
+| text input, select, textarea | `getByLabel`, `getByRole('textbox' / 'combobox', { name })`; `getByPlaceholder` only as a fallback |
+| checkbox, radio              | `getByRole('checkbox' / 'radio', { name })`, `getByLabel`                                          |
+| image                        | `getByAltText`, `getByRole('img', { name })`                                                       |
+| heading                      | `getByRole('heading', { name, level })`                                                            |
+| landmark (nav, main, region) | `getByRole(...)`, with `{ name }` when there are several                                           |
+| alert, status                | `getByRole` to scope; no name from text, so find by text (`getByText`, `filter({ hasText })`)      |
+| plain text (div, span, p)    | `getByText`                                                                                        |
+| element with a tooltip       | `getByTitle`                                                                                       |
+
+Pick the highest one in [Playwright's order](https://playwright.dev/docs/locators#quick-guide) that the element genuinely has; don't ask for one it shouldn't have.
+
+### 5. How to ask
+
+Small, one fix per ticket, with before/after. Example:
+
+```
+Title:   Label the toast notification area for screen readers
+Type:    Accessibility improvement
+Where:   every page, <div id="toast-container">
+Problem: Screen-reader users can't find or identify notifications: the container is an unnamed div.
+Fix:     <div id="toast-container" role="region" aria-label="Notifications">
+Refs:    WAI-ARIA APG "Landmark regions"; MDN "ARIA: region role"; WCAG 4.1.2
+Bonus:   automated tests can find toasts by role instead of a test id.
+```
+
+- Raise it early (design review, PR review), not as a blocker on your test.
+- Until it ships, use the test id and leave a one-line comment linking the ticket.
+- Accept "no" when there's no user benefit; that's when the test id stays.
+- In this repo we never change `webapp/`, so this stays a note (Later list).
+
+### 6. Interview answer
+
+"When I can't find an element the way a user would, I first check whether it's an accessibility gap, like a missing label or a div acting as a button, and ask the developers for that fix, framed as accessibility. If there's no real user need, I use a test id rather than invent an `aria-label`, because a wrong label makes the page worse for screen-reader users."
+
+**Advanced, later:** automated accessibility scans with `@axe-core/playwright` (Week 10) find many of these gaps for you.
+**C# / Selenium:** same conversation; Selenium teams usually ask for `id`s. ⚠ Watch out: in Playwright an `id` is a CSS selector; ask for the accessibility fix first, then a `data-testid`.
+
+More: [MDN: ARIA roles](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Roles), [APG: Providing accessible names and descriptions](https://www.w3.org/WAI/ARIA/apg/practices/names-and-descriptions/), [Using ARIA](https://www.w3.org/TR/using-aria/).
