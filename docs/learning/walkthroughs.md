@@ -848,7 +848,35 @@ export class Toast {
 
 ## Create account spec
 
-`tests/specs/create-account/create-account.spec.ts` (Week 3 Day 1). Same imports, `@regression` describe and signed-out `test.use` as the other specs.
+`tests/specs/create-account/create-account.spec.ts` (Week 3 Day 1; generated data Day 2). Same `@regression` describe and signed-out `test.use` as the other specs.
+
+### validAccount()
+
+```ts
+import { faker } from '@faker-js/faker';
+import type { AccountDetails } from '../../pages/CreateAccountPage';
+
+function validAccount(overrides: Partial<AccountDetails> = {}): AccountDetails {
+  const password = faker.internet.password({ length: 12 });
+  return {
+    fullName: faker.person.fullName(),
+    email: faker.internet.email(),
+    password,
+    confirmPassword: password,
+    acceptTerms: true,
+    ...overrides,
+  };
+}
+```
+
+- `import { faker }` [NPM]: the generator object. `import type { AccountDetails }` [TS]: our form type; removed when the code runs.
+- `validAccount(...)` [OURS]: one input, `overrides`: some or none of the fields (`Partial`), `{}` when nothing is passed. Returns all five fields (`: AccountDetails`).
+- `const password`: one random 12-character password, used twice so the two password fields match.
+- `fullName`, `email`: new random values each call. `acceptTerms: true`: fixed.
+- `...overrides` [JS]: copies the test's fields in **last**, so they replace the random ones. Example: `validAccount({ email: 'fred.test.com' })` returns a random name and password with that email.
+- Outside `describe`, at the top of the spec: only this spec uses it. Why each choice: [concepts](concepts.md#a-factory-with-overrides), [DR 003](../decisions/003-test-data.md).
+
+### Tests
 
 ```ts
 test(
@@ -857,13 +885,7 @@ test(
   async ({ page, createAccountPage, homePage, signInPage }) => {
     await homePage.goto();
     await homePage.navBar.openCreateAccount();
-    await createAccountPage.createAccount({
-      fullName: 'fred fredy',
-      email: 'fred@test.com',
-      password: 'Password12345',
-      confirmPassword: 'Password12345',
-      acceptTerms: true,
-    });
+    await createAccountPage.createAccount(validAccount());
 
     await expect(createAccountPage.toast.message).toContainText(
       'Account created successfully!',
@@ -891,15 +913,14 @@ test('an empty form shows an error for each required field', async ({ homePage, 
 });
 ```
 
-- `createAccount({})` [OURS]: no fields given, so it only clicks Create Account. No confirm error: two empty passwords match.
+- `createAccount({})` [OURS]: no fields given, so it only clicks Create Account. No confirm error: two empty passwords match. Not `validAccount()`: that would fill a valid account and no errors would show.
 
-The other three follow one pattern: every field valid except one, then one assertion.
+The other three follow one pattern: `validAccount({ ... })` with one invalid field, then one assertion.
 
-| Test                                               | The one invalid field                      | Asserts         |
-| -------------------------------------------------- | ------------------------------------------ | --------------- |
-| `'an invalid email format shows an email error'`   | `email: 'fred.test.com'` (no `@`)          | `emailError`    |
-| `'a short password shows a password length error'` | `password` and `confirmPassword: 'Pass12'` | `passwordError` |
-| `'terms not checked shows a terms error'`          | `acceptTerms: false`                       | `termsError`    |
+| Test                                               | The one invalid field                                             | Asserts         |
+| -------------------------------------------------- | ----------------------------------------------------------------- | --------------- |
+| `'an invalid email format shows an email error'`   | `validAccount({ email: 'fred.test.com' })` (no `@`)               | `emailError`    |
+| `'a short password shows a password length error'` | `validAccount({ password: 'Pass12', confirmPassword: 'Pass12' })` | `passwordError` |
+| `'terms not checked shows a terms error'`          | `validAccount({ acceptTerms: false })`                            | `termsError`    |
 
 - Why one invalid field: a failure then names one rule ([concepts](concepts.md#one-invalid-field-per-test)).
-- The valid details repeat in every test; Day 2 replaces them with typed generated test data.

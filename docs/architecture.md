@@ -198,6 +198,13 @@ await page.goto('/html/signin.html');
 Every test runs alone, in any order, in parallel. No test relies on another test's state.
 Source: [Best practices: make tests isolated](https://playwright.dev/docs/best-practices#make-tests-as-isolated-as-possible).
 
+### Test data
+
+- Valid data comes from a typed factory with overrides (`validAccount(overrides)`) that uses Faker; each test overrides only the field it tests, written by hand so the reader sees it.
+- The factory sits at the top of the spec that uses it; it moves to `tests/test-data/` when a second spec needs it.
+- No `faker.seed()`. The one fixed user `user@test.com` is for sign-in only (read-only).
+- How it works: [concepts: Test data](learning/concepts.md#test-data-week-3-day-2). Why: [decision record 003](decisions/003-test-data.md).
+
 ### Types
 
 Strict TypeScript. No `any`. Explicit types on page objects, helpers and test data.
@@ -335,6 +342,7 @@ Why the framework is shaped this way, one record per topic, in [decisions/](deci
 
 - [001. Week 1 tooling and workflow](decisions/001-week-1-tooling-and-workflow.md): PRs and squash merge, the three checking tools, check order, TypeScript pin, line endings
 - [002. Framework design](decisions/002-framework-design.md): fixtures, composition with no base classes, assertions in specs, pages mirror specs
+- [003. Test data](decisions/003-test-data.md): generated valid data with hand-written invalid values, one factory with overrides, no seed, the one fixed sign-in user
 
 ## Official docs
 

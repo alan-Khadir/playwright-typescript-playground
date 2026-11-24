@@ -1,4 +1,18 @@
 import { expect, test } from '../../fixtures';
+import { faker } from '@faker-js/faker';
+import type { AccountDetails } from '../../pages/CreateAccountPage';
+
+function validAccount(overrides: Partial<AccountDetails> = {}): AccountDetails {
+  const password = faker.internet.password({ length: 12 });
+  return {
+    fullName: faker.person.fullName(),
+    email: faker.internet.email(),
+    password,
+    confirmPassword: password,
+    acceptTerms: true,
+    ...overrides,
+  };
+}
 
 test.describe('Create account', { tag: '@regression' }, () => {
   test.use({ storageState: { cookies: [], origins: [] } });
@@ -9,13 +23,8 @@ test.describe('Create account', { tag: '@regression' }, () => {
     async ({ page, createAccountPage, homePage, signInPage }) => {
       await homePage.goto();
       await homePage.navBar.openCreateAccount();
-      await createAccountPage.createAccount({
-        fullName: 'fred fredy',
-        email: 'fred@test.com',
-        password: 'Password12345',
-        confirmPassword: 'Password12345',
-        acceptTerms: true,
-      });
+
+      await createAccountPage.createAccount(validAccount());
 
       await expect(createAccountPage.toast.message).toContainText(
         'Account created successfully!',
@@ -50,13 +59,9 @@ test.describe('Create account', { tag: '@regression' }, () => {
     await homePage.goto();
     await homePage.navBar.openCreateAccount();
 
-    await createAccountPage.createAccount({
-      fullName: 'fred freddy',
-      email: 'fred.test.com',
-      password: 'Password12345',
-      confirmPassword: 'Password12345',
-      acceptTerms: true,
-    });
+    await createAccountPage.createAccount(
+      validAccount({ email: 'fred.test.com' }),
+    );
 
     await expect(createAccountPage.emailError).toBeVisible();
   });
@@ -68,13 +73,9 @@ test.describe('Create account', { tag: '@regression' }, () => {
     await homePage.goto();
     await homePage.navBar.openCreateAccount();
 
-    await createAccountPage.createAccount({
-      fullName: 'fred freddy',
-      email: 'fred@test.com',
-      password: 'Pass12',
-      confirmPassword: 'Pass12',
-      acceptTerms: true,
-    });
+    await createAccountPage.createAccount(
+      validAccount({ password: 'Pass12', confirmPassword: 'Pass12' }),
+    );
 
     await expect(createAccountPage.passwordError).toBeVisible();
   });
@@ -86,13 +87,7 @@ test.describe('Create account', { tag: '@regression' }, () => {
     await homePage.goto();
     await homePage.navBar.openCreateAccount();
 
-    await createAccountPage.createAccount({
-      fullName: 'fred freddy',
-      email: 'fred@test.com',
-      password: 'Password12345',
-      confirmPassword: 'Password12345',
-      acceptTerms: false,
-    });
+    await createAccountPage.createAccount(validAccount({ acceptTerms: false }));
 
     await expect(createAccountPage.termsError).toBeVisible();
   });
