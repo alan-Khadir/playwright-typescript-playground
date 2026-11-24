@@ -1100,6 +1100,35 @@ npm test                                          # 4. 17 passed (1 setup + 16 t
 npx playwright test tests/specs/create-account    # 5. Check: 6 passed (setup + 5 create-account tests)
 ```
 
+## Step 18. Generated test data with Faker (Week 3 Day 2)
+
+**Where:** VS Code terminal, repo root `PS C:\git-personal\playwright-typescript-playground>`.
+
+```powershell
+git switch main                          # go to the main branch
+git pull                                 # bring down the latest main from GitHub
+git switch -c feat/test-data             # create the branch AND switch to it
+npm install --save-dev @faker-js/faker   # add Faker to devDependencies
+```
+
+Check: `package.json` devDependencies lists `"@faker-js/faker": "^10.6.0"`.
+
+| File                                                | What it is                                                                    |
+| --------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `tests/specs/create-account/create-account.spec.ts` | `validAccount(overrides)` factory; four tests use it (empty form stays `{}`). |
+| `docs/decisions/003-test-data.md`                   | Decision record 003: test data.                                               |
+
+Rules: `docs/architecture.md`, "Test data".
+
+**Check (fastest first):**
+
+```powershell
+npm run format:check                              # 1. Prettier: "All matched files use Prettier code style!"
+npm run lint                                      # 2. ESLint: no output = no problems
+npm run typecheck                                 # 3. tsc: no output = no type errors
+npm test                                          # 4. 17 passed (1 setup + 16 tests)
+```
+
 ## Run, debug and report commands
 
 **Where:** VS Code terminal, in the repo root.

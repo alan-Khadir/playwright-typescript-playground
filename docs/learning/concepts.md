@@ -1232,7 +1232,7 @@ Docs: [getByTestId](https://playwright.dev/docs/locators#locate-by-test-id), [to
 
 - Each validation test breaks **one** rule; every other field is valid. A pass or a failure then points at exactly one rule.
 - ✘ Short-password test that still had `email: 'fred.test.com'` (copied from the email test): rejected for two reasons, so it can't prove the password rule alone stops it. ✔ `email: 'fred@test.com'`.
-- The form has `novalidate`, so the browser's own checks (`required`, `type="email"`, `minlength="8"`) don't block the submit; only the app's messages appear. Native vs app validation: Week 3 Day 2.
+- The form has `novalidate`, so the browser's own checks (`required`, `type="email"`, `minlength="8"`) don't block the submit; only the app's messages appear. See [Native vs app validation](#native-vs-app-validation).
 - Not covered on purpose: name shorter than 2 characters and "Passwords do not match" (same pattern; the name error is already checked in the empty-form test). A data-driven test covers every rule in one table in Week 6.
 - **Interview line:** "Each validation test has one invalid field and everything else valid, so a failure names one rule. For many rules I'd use a data-driven test rather than copy the same test."
 
@@ -1396,3 +1396,78 @@ Bonus:   automated tests can find toasts by role instead of a test id.
 **C# / Selenium:** same conversation; Selenium teams usually ask for `id`s. ⚠ Watch out: in Playwright an `id` is a CSS selector; ask for the accessibility fix first, then a `data-testid`.
 
 More: [MDN: ARIA roles](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Roles), [APG: Providing accessible names and descriptions](https://www.w3.org/WAI/ARIA/apg/practices/names-and-descriptions/), [Using ARIA](https://www.w3.org/TR/using-aria/).
+
+---
+
+## Test data (Week 3 Day 2)
+
+Our code: [walkthroughs: create account spec](walkthroughs.md#create-account-spec). Decisions and trade-offs: [decision record 003](../decisions/003-test-data.md).
+
+### Faker
+
+- **What:** `@faker-js/faker` [NPM] generates realistic random values: `faker.person.fullName()`, `faker.internet.email()`, `faker.internet.password({ length: 12 })`. `faker` is an object; `faker.internet` is a group of methods inside it.
+- **Why:** an app that saves data rejects the same email twice ("email already taken"), so fixed data fails on the second run or in parallel. Generated data is new every run.
+- **Main alternative:** hand-written values: readable, but collide once data is stored, and copied blocks drift.
+- **C#:** Bogus (`new Faker().Person.FullName`).
+- Docs: [fakerjs.dev](https://fakerjs.dev/api/)
+
+### A factory with overrides
+
+A _factory_ [OURS] is a function that returns a fresh, valid object each time. The test passes only the field it wants different.
+
+```ts
+function validAccount(overrides: Partial<AccountDetails> = {}): AccountDetails {
+  const password = faker.internet.password({ length: 12 });
+  return {
+    fullName: faker.person.fullName(),
+    email: faker.internet.email(),
+    password,
+    confirmPassword: password,
+    acceptTerms: true,
+    ...overrides,
+  };
+}
+```
+
+- `const password` once, so `confirmPassword` gets the **same** value (two `faker` calls would give two different passwords: "passwords don't match").
+- `password,` is shorthand [JS] for `password: password`.
+- `validAccount()` = all valid. `validAccount({ email: 'fred.test.com' })` = valid except the email.
+- ✘ `createAccount(validAccount({}))` in the empty-form test: fills a full valid account, so no errors show. ✔ `createAccount({})`: fills nothing.
+- Lives in the spec while one spec uses it; moves to `tests/test-data/` when a second spec needs it.
+- **C#:** a test data builder, or a record with `with { ... }`.
+
+### Spread `...`
+
+1. **Kind:** spread syntax, a built-in symbol of the language (like `!==` or `=`).
+2. **From:** JavaScript; it runs in the real code.
+3. **Does:** unpacks an object's properties into a new object.
+4. **Use:** `const x = { a: 1, b: 2, ...{ b: 9 } }` gives `{ a: 1, b: 9 }`. In our code: `...overrides` in `validAccount`.
+5. **Gotchas:** the **last** property with a name wins, so `...overrides` must be last (✘ first: the random password replaces `'Pass12'` and the short-password test fails). Copies one level deep only.
+6. **C#:** nearest is `record with { Password = "Pass12" }`; C# has no `...` for objects.
+7. Docs: [MDN: spread syntax](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Spread_syntax)
+
+### Default parameter `= {}`
+
+- [JS] `overrides: Partial<AccountDetails> = {}`: if the caller passes nothing, `overrides` is `{}`. So `validAccount()` works.
+- **C#:** `void M(int x = 0)`. Watch out: in JS the default can be any expression, not only a constant.
+- Docs: [MDN: default parameters](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/Default_parameters)
+
+### Seed: repeatable "random" values
+
+- `faker.seed(123)` [NPM]: the number is any value you pick; the same seed gives the same values every run. C#: `new Random(123)`.
+- Seeded = failures repeat, but the data never changes (no more coverage than fixed data). Not seeded (ours) = new values every run, so a value-specific bug (`Seán O'Brien`) can appear; reproduce it by copying the values from the trace into overrides.
+
+### Native vs app validation
+
+- **Native** [HTML]: `required`, `type="email"`, `minlength="8"`. The browser blocks the submit and shows its own bubble. The bubble isn't in the page's HTML, so no locator finds it.
+- **App** [the app's JS]: a script on the form's `submit` event writes messages into `<span role="alert" class="field-error">`. Normal elements: `getByText` finds them.
+- Our form has `novalidate`: the browser doesn't block, the app decides. Users see only the app's messages, so that's what we test.
+- If `novalidate` were removed: the browser cancels the submit, the app's script never runs, and the empty-form test fails with "element(s) not found".
+- Testing native validation (when a form uses it): `await expect(emailInput).toHaveJSProperty('validity.valid', false)`. Check `validity`, not `validationMessage` text: the text differs by browser and language. Selenium: `GetDomProperty("validationMessage")`.
+
+### Unique data vs shared fixed users (at scale)
+
+- Own user per test: isolated, safe in parallel; slower and leaves data to clean up (create by API, not UI).
+- Shared fixed users: fast; tests interfere when one changes the user. Fine for read-only use (our `user@test.com`).
+
+**Interview line:** "Valid data comes from a typed factory that uses Faker, and each test overrides only the field it's testing, so tests don't collide and the bad value is visible in the test. I don't seed it; when a value-specific failure happens I take the values from the trace and pin them as overrides."
