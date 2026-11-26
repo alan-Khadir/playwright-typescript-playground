@@ -1129,6 +1129,40 @@ npm run typecheck                                 # 3. tsc: no output = no type 
 npm test                                          # 4. 17 passed (1 setup + 16 tests)
 ```
 
+## Step 19. Topic pages: inputs and selects (Week 3 Days 3-4)
+
+**Where:** VS Code terminal, repo root `PS C:\git-personal\playwright-typescript-playground>`.
+
+```powershell
+git switch main                          # go to the main branch
+git pull                                 # bring down the latest main from GitHub
+git switch -c feat/topic-pages           # create the branch AND switch to it
+```
+
+No new packages.
+
+| File                                             | What it is                                                        |
+| ------------------------------------------------ | ----------------------------------------------------------------- |
+| `tests/components/TopicLayout.ts`                | adds `widget`, each topic's interactive area                      |
+| `tests/pages/topics/CryptographyAndCodesPage.ts` | contribute-a-fact form: textarea, date, image upload with preview |
+| `tests/pages/topics/VolcanicWorldsPage.ts`       | range slider                                                      |
+| `tests/pages/topics/TimeAndCalendarsPage.ts`     | native transport select; custom supplies multi-select (pills)     |
+| `tests/specs/topics/*.spec.ts`                   | one spec per topic page (5 tests)                                 |
+| `tests/fixtures/index.ts`                        | a fixture for each of the three page objects                      |
+| `tests/test-data/sample-image.png`               | 1×1 PNG the upload test uses                                      |
+| `docs/decisions/004-spec-naming.md`              | Decision record 004: spec naming                                  |
+
+Rules: `docs/architecture.md`, "Locators", "Page objects", "Naming".
+
+**Check (fastest first):**
+
+```powershell
+npm run format:check                              # 1. Prettier: "All matched files use Prettier code style!"
+npm run lint                                      # 2. ESLint: no output = no problems
+npm run typecheck                                 # 3. tsc: no output = no type errors
+npm test                                          # 4. 22 passed (1 setup + 21 tests)
+```
+
 ## Run, debug and report commands
 
 **Where:** VS Code terminal, in the repo root.
@@ -1329,3 +1363,6 @@ git log --oneline
 | Signed-in tests fail; the trace or error context shows `signin.html?redirect=dashboard`                                                                                                         | `playwright/.auth/user.json` is stale (saved for another origin, e.g. `127.0.0.1` instead of `localhost`) and `--no-deps` skipped setup, so it wasn't rebuilt                                                         | Run without `--no-deps` (`npm test`). Never hand-edit or commit the file. (Week 2 Day 5)                                                                                                                                                                                                                                                                                                                                           |
 | `strict mode violation: getByRole('alert') resolved to 6 elements` on the create account page                                                                                                   | The 5 field-error spans are `role="alert"` too (inside `main`), plus the toast outside it                                                                                                                             | Use the toast's test id: `getByTestId('toast-notification')` (`Toast.message`). (Week 3 Day 1)                                                                                                                                                                                                                                                                                                                                     |
 | `getByRole('alert', { name: '...' })` times out: element(s) not found                                                                                                                           | An alert takes no accessible name from its text (DevTools → Accessibility: `Name: ""`)                                                                                                                                | Find it by its text: `page.getByRole('main').getByText('...')`. (Week 3 Day 1)                                                                                                                                                                                                                                                                                                                                                     |
+| `locator.selectOption: Test timeout of 30000ms exceeded`, call log `did not find some options`                                                                                                  | `selectOption` matches an option's value or label **exactly**; `'Rocket Ship'` is neither the value (`rocket`) nor the label (`🚀 Rocket Ship`)                                                                       | Pass the exact visible label, emoji included: `selectOption({ label: '🚀 Rocket Ship' })`. (Week 3 Day 4)                                                                                                                                                                                                                                                                                                                          |
+| `npm run lint` fails on an unused import like `import { th } from '@faker-js/faker';` you never wrote                                                                                           | VS Code auto-import: typing `th` or `de` and pressing Enter/Tab on the suggestion imports faker's Thai or German locale                                                                                               | Delete the line. When the suggestion list pops up for a word you're still typing, press **Esc**. (Week 3 Day 3)                                                                                                                                                                                                                                                                                                                    |
+| `expect(locator).toHaveValue` fails with `Not an input element`                                                                                                                                 | `toHaveValue` only works on `input`, `textarea` and `select`; the element shows text (e.g. an `<output>`)                                                                                                             | Use `toHaveText(...)` for text an element shows. (Week 3 Day 4)                                                                                                                                                                                                                                                                                                                                                                    |

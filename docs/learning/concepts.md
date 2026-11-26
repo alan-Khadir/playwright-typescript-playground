@@ -1471,3 +1471,159 @@ function validAccount(overrides: Partial<AccountDetails> = {}): AccountDetails {
 - Shared fixed users: fast; tests interfere when one changes the user. Fine for read-only use (our `user@test.com`).
 
 **Interview line:** "Valid data comes from a typed factory that uses Faker, and each test overrides only the field it's testing, so tests don't collide and the bad value is visible in the test. I don't seed it; when a value-specific failure happens I take the values from the trace and pin them as overrides."
+
+## Topic pages: inputs and selects (Week 3 Days 3-4)
+
+What we built: `TopicLayout.widget` and three topic page objects in `tests/pages/topics/` (Cryptography & Codes, Volcanic Worlds, Time & Calendars), one spec each in `tests/specs/topics/`. Our code line by line: [walkthroughs: CryptographyAndCodesPage](walkthroughs.md#cryptographyandcodespage), [TimeAndCalendarsPage](walkthroughs.md#timeandcalendarspage).
+
+Sources: [Actions (input)](https://playwright.dev/docs/input), [Assertions](https://playwright.dev/docs/test-assertions), [Locators: filtering](https://playwright.dev/docs/locators#filtering-locators).
+
+### Opening a page by URL: `encodeURIComponent` and template literals
+
+- `encodeURIComponent(text)` [JS]: a built-in function that makes text safe inside a URL. `encodeURIComponent('Cryptography & Codes')` → `'Cryptography%20%26%20Codes'` (`%20` = space, `%26` = `&`).
+- Why: in a URL `&` starts a new parameter. ✘ `?topic=Cryptography & Codes` → the app reads "Cryptography " and shows "Topic Not Found". ✔ `?topic=${encodeURIComponent('Cryptography & Codes')}`.
+- Template literal [JS]: a string in **backticks** where `${ }` runs code and puts the result in: `` `Hello ${name}` ``, `` `${topic.title} (${topic.points} pts)` ``. ✘ `'Hi ${name}'` (quotes) prints `Hi ${name}`. ✘ `` `${a, b}` `` keeps only `b` (comma operator): give each value its own `${ }`. Quotes typed inside backticks are printed: ✘ `` `'Packed:'${s}` `` ✔ `` `Packed: ${s}` ``.
+- C#: `Uri.EscapeDataString(...)` and `$"Hello {name}"`.
+- Docs: [MDN: encodeURIComponent](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/encodeURIComponent), [MDN: template literals](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Template_literals)
+
+### Inputs: textarea, date, range, file
+
+| Input          | Action [PW]                                  | Check [PW]                   | Watch out                                                                                                                                |
+| -------------- | -------------------------------------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `<textarea>`   | `fill('text')`                               | `toHaveValue('text')`        | Same as a text input.                                                                                                                    |
+| `type="date"`  | `fill('2026-11-25')`                         | `toHaveValue('2026-11-25')`  | Value is always `YYYY-MM-DD`; the **displayed** format follows the locale (UK `25/11/2026`). ✘ `fill('25/11/2026')` → _Malformed value_. |
+| `type="range"` | `fill(String(75))`                           | `toHaveValue('75')`          | `fill` takes a string: `String(value)` [JS] turns `75` into `'75'`. Role `slider`.                                                       |
+| `type="file"`  | `setInputFiles(path)`                        | the app's result (a preview) | Sets the file without the OS file dialog (Playwright can't drive that dialog).                                                           |
+| checkbox       | `check()` / `uncheck()` / `setChecked(bool)` | `toBeChecked()`              | `check()` is safe to repeat; `click()` toggles, so a second click unticks.                                                               |
+
+- **File paths:** `path.join(__dirname, '../../test-data/sample-image.png')`. `path` [Node] builds paths with the right separator; `__dirname` [Node] is the folder of the current file (works because our `package.json` is `"type": "commonjs"`). ✘ `'tests/test-data/x.png'` is relative to wherever the command runs. Test files live in `tests/test-data/`.
+- C#/Selenium: file upload = `SendKeys(@"C:\path\file.png")` on the input.
+
+### `toHaveValue` vs `toHaveText` vs `toContainText`
+
+| Assertion [PW]        | Checks                                  | Use on                                      | With a string                  |
+| --------------------- | --------------------------------------- | ------------------------------------------- | ------------------------------ |
+| `toHaveValue('25')`   | what is **typed in or set** (the value) | `input`, `textarea`, `select` only          | full match                     |
+| `toHaveText('25')`    | text **shown** in the element           | anything else (`output`, `p`, `span`, `h1`) | full match (spaces normalised) |
+| `toContainText('25')` | shown text **contains** this            | same as `toHaveText`                        | part match                     |
+
+- ✘ `toHaveValue` on our `<output>` (`sliderValue`) fails: _Not an input element_. ✔ `toHaveText('25')`.
+- ✘ `toHaveText('1 of 3')` when the element shows "Selected: 1 of 3" (full match fails). ✔ `toHaveText('Selected: 1 of 3')` or `toContainText('1 of 3')`.
+- Trap: **locators** with a string match part of the text and ignore case (`getByText('Selected:')`); `toHaveText` with a string matches the whole text. So: locate by the part that never changes, assert the full text.
+
+### Native `<select>` vs a custom multi-select
+
+- **Native** (`transportSelect`): role `combobox`, name from its `<label>`. Pick with `selectOption` [PW]: `selectOption('rocket')` matches an option's value **or** label exactly; `selectOption({ label: '🚀 Rocket Ship' })` matches only the visible label (ours: user-facing, and no accidental match on a value). Exact match, emoji included: ✘ `'Rocket Ship'` → retries until timeout, call log _did not find some options_. ✘ `click()` on an `<option>` doesn't work. C#: `new SelectElement(el).SelectByText(...)`. Docs: [Select options](https://playwright.dev/docs/input#select-options).
+- **Custom** (supplies): no `<select>`; the app builds it from checkboxes (`check()`), a counter ("Selected: N of 3") and pills with ✕ buttons. You test it through what the user sees: tick, check the counter and the pills, click ✕, check again.
+
+### Locators that depend on a test's value
+
+- Same every time (a fixed button, the counter) → `readonly` property, set in the constructor.
+- Depends on a value the test passes (which supply) → built **inside the method** from its parameter, like `openTopic(title)`:
+  ```ts
+  async pickSupplies(supplies: string[]): Promise<void> {
+    for (const supply of supplies) {
+      await this.layout.widget.getByRole('checkbox', { name: supply }).check();
+    }
+  }
+  ```
+- Why not a `readonly` property set later: the constructor runs **once**, when the fixture builds the page object, before the test passes any value; and a `readonly` property can't be set again (`npm run typecheck` reports _Cannot assign to 'x' because it is a read-only property_). Dropping `readonly` to change it per call creates hidden "last value" state.
+
+### `readonly` (precise rule)
+
+- [TS] A `readonly` property gets its value in **two places only**: where it's declared (`readonly max = 3;`) or in the constructor. Never after. Checked by `npm run typecheck` only; nothing checks it when the code runs.
+- C#: the same rule as a `readonly` field. Docs: [TypeScript: readonly](https://www.typescriptlang.org/docs/handbook/2/classes.html#readonly)
+
+### CSS tag + `filter({ has })` for elements with no role
+
+- `.locator('section')` [PW]: the string is a **CSS selector**, and a bare word is a **tag name**: every `<section>` inside. Not text: searching by text is `getByText`.
+- `locator(selectorOrLocator: string | Locator, options?)`: one parameter that takes a string (CSS/XPath) **or** a Locator (searched inside; `widget.locator(x)` = `widget` chained with `x`). We pass strings; chaining `getBy...` is clearer than passing a Locator.
+- `.filter({ has: locator })` [PW] keeps elements that contain a match; `hasText`, `hasNot`, `hasNotText` work the same way. Not the same as JS array `.filter(fn)`: same name, different owner (a Locator vs an array).
+- Our two cases, both because the element has no role or label: `communityFacts` = the `section` that has the "Community Facts" heading; `supplyPills` = the `span`s that have a "Remove ..." button. The `filter` is what makes it robust: ✘ `locator('span')` alone matched all 10 spans (8 checklist labels + 2 pills), so `toHaveCount(2)` received 10.
+- Inside `has`, `page.getByRole(...)` is searched **within each candidate**, not the whole page.
+- Locator `.page()` is a **method** returning the tab: ✘ `.locator('section').page.getByRole(...)` (typecheck error, and it would leave the scope anyway).
+
+### Union types and literal unions
+
+- [TS] `A | B` = "this OR that", for one value. `selectorOrLocator: string | Locator` accepts either.
+- A literal union lists exact allowed **values**: `type Supply = 'Compass' | 'Telescope' | 'Journal';`. `packSupplies(['Banana'])` → `npm run typecheck` reports _Type '"Banana"' is not assignable to type 'Supply'_: a typo caught in seconds, not after a 30 s timeout. Worth it when several specs share the values; today our specs pass plain strings.
+- C#: closest is an `enum`. Watch out: a TS literal union is just strings, removed before the code runs.
+- Docs: [TypeScript: union types](https://www.typescriptlang.org/docs/handbook/2/everyday-types.html#union-types), [literal types](https://www.typescriptlang.org/docs/handbook/2/everyday-types.html#literal-types)
+
+### Arrays and `for...of` with `await`
+
+- `string[]` [TS]: "array of strings". No `List<string>` in TS; a JS array already grows like a C# `List`.
+- `for (const supply of supplies) { ... }` [JS]: once per item. C#: `foreach`.
+- ✘ `supplies.forEach(async (s) => { await ... })`: `forEach` ignores the Promise each inner function returns, so the method returns before the ticks finish (flaky). `npm run lint` reports `@typescript-eslint/no-misused-promises`. ✔ `for...of` with `await` inside: each step finishes before the next. Same trap in C# with `list.ForEach(async x => ...)`.
+- Docs: [MDN: for...of](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/for...of)
+
+### Asserting a representative few
+
+- After submit, the app clears the whole form with one `form.reset()`, so we check the two new input types (textarea, date), not all four fields.
+- The supplies counter and the pill count are both checked because they catch **different** bugs (a pill removed but its checkbox still ticked shows only in the counter).
+- Random results (the slider game's target) aren't asserted; controlling randomness comes later.
+
+### Interview line
+
+"I locate form controls by their labels and scope them inside the component they belong to, assert values with `toHaveValue` and visible text with `toHaveText`, and when an element has no role I find it by what it contains, a heading or a button, rather than by an id. Locators that depend on test data are built inside the action method, and I loop with `for...of` so every `await` is respected."
+
+## Regular expressions (RegExp) (Week 3 Days 3-4)
+
+A reference for the patterns useful in test automation.
+
+1. **What kind of thing:** a pattern for matching text. A built-in object type.
+2. **From:** JavaScript. Playwright accepts one wherever it accepts text to match.
+3. **What it does:** describes a _shape_ of text ("contains these words", "starts with Remove", "any number") instead of one exact string.
+4. **Syntax:** written between slashes, **no quotes**: `/interactive component/`. Flags go after the closing slash: `/remove/i`.
+
+### The pieces you need
+
+| Pattern                | Means                                         | Matches                                | Doesn't match            |
+| ---------------------- | --------------------------------------------- | -------------------------------------- | ------------------------ |
+| `/Compass/`            | contains "Compass" anywhere                   | "🧭 Compass", "Remove 🧭 Compass"      | "compass" (case)         |
+| `/compass/i`           | `i` flag = ignore case                        | "🧭 Compass", "COMPASS"                |                          |
+| `/^Remove /`           | `^` = starts with                             | "Remove 📚 Research Books"             | "📚 Remove"              |
+| `/Books$/`             | `$` = ends with                               | "📚 Research Books"                    | "Books list"             |
+| `/^Selected: 2 of 3$/` | `^...$` = the whole text exactly              | "Selected: 2 of 3"                     | "Selected: 2 of 3 items" |
+| `/\d/`                 | one digit 0-9                                 | "Attempt 1 of 5"                       | "Attempt one"            |
+| `/\d+/`                | `+` = one or more of the previous             | "75", "100"                            |                          |
+| `/Selected: \d of 3/`  | a digit in the middle                         | "Selected: 0 of 3", "Selected: 2 of 3" | "Selected: 10 of 3"      |
+| `/.*/`                 | `.` = any one character, `*` = zero or more   | anything                               |                          |
+| `/Page \d+ of \d+/`    | combined                                      | "Page 1 of 3"                          |                          |
+| `/Rocket\|Engine/`     | `\|` = either                                 | "🚀 Rocket Ship", "🚂 Steam Engine"    | "Horse"                  |
+| `/\(10 pts\)/`         | `\` escapes a special character               | "(10 pts)"                             | "10 pts"                 |
+| `/dashboard\.html/`    | `\.` = a real dot (`.` alone = any character) | "/html/dashboard.html"                 |                          |
+
+Special characters that need `\` to mean themselves: `. ( ) [ ] { } ? * + ^ $ | \ /`.
+
+### Where Playwright accepts a RegExp
+
+```ts
+// Locators
+page.getByRole('region', { name: /interactive component/ }); // ours: TopicLayout.widget
+page.getByRole('button', { name: /^Remove / }); // ours: supplyPills
+page.getByText(/^Page \d+ of 3$/);
+locator.filter({ hasText: /Explored/ });
+// Assertions
+await expect(counter).toHaveText(/Selected: \d of 3/); // any number picked
+await expect(page).toHaveURL(/signin\.html\?redirect=dashboard/); // part of the URL
+await expect(card).toContainText(/\d+pts/); // a card's "🏆 20pts" badge
+```
+
+### String or RegExp?
+
+- A plain **string** in a locator (`getByText('Selected:')`, `{ name: 'Compass' }`) already matches **part** of the text, ignoring case. Use a string when that's enough: easier to read.
+- Use a RegExp when you need: starts/ends with (`^`, `$`), a changing part in the middle (`\d`), either/or (`|`), or case-sensitive part matching.
+- In assertions, a string is a **full** match; a RegExp lets you check part or a shape (`toHaveText(/1 of 3/)`).
+- `{ exact: true }` with a string = whole text, case-sensitive. Often clearer than `/^...$/`.
+
+### Gotchas
+
+- ✘ `{ name: '/interactive component/' }`: quotes make it a **string**, slashes included → no match, timeout. ✔ `{ name: /interactive component/ }`.
+- Case-sensitive by default: `/remove/` doesn't match "Remove". Add `i` if case doesn't matter.
+- Escape dots, brackets and `?` in URLs and prices: ✘ `/dashboard.html?topic/` ✔ `/dashboard\.html\?topic/`.
+- Keep patterns short; a long clever pattern is hard to review. If you need one, a comment says what it matches.
+
+5. **When to use / not:** use when text has a fixed part and a changing part, or you need start/end anchors. Don't use when a plain string or `{ exact: true }` says the same thing.
+6. **C#:** `new Regex(@"^Remove ")`, `RegexOptions.IgnoreCase` = `i`. Same symbols for these basics. Watch out: in JS you write the pattern between slashes, not in a string, so no `@"..."` and no double escaping.
+7. **Docs:** [MDN: Regular expressions guide](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_expressions), [Playwright: locate by text](https://playwright.dev/docs/locators#locate-by-text).

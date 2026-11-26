@@ -43,6 +43,6 @@ The create account tests typed the same hand-written details (`fred@test.com`) i
 
 ## Consequences
 
-- New forms get a typed factory with overrides, next to the spec that uses it.
+- New forms get a typed factory with overrides, next to the spec that uses it, once 2+ tests share the same data shape. A single test builds its object inline (`FactDetails` in the Cryptography spec, Week 3 Day 3), still with faker for the filler values. (Amended 2026-11-26.)
 - Week 6 data-driven tests (name length, password mismatch) pass their bad values as overrides.
 - How faker and spread work: [learning/concepts.md](../learning/concepts.md).
