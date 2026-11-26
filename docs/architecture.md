@@ -23,7 +23,7 @@ docs/                 setup-guide.md, architecture.md
 tests/
   components/         parts used on many pages, included by page objects as a property (composition)
     NavBar.ts         the Main navigation: its links, the dark mode button, and their actions
-    TopicLayout.ts    the layout all 10 topic pages share; today the loader and the title (h1)
+    TopicLayout.ts    the layout all 10 topic pages share: the loader, the title (h1) and the widget
     Toast.ts          the short-lived pop-up message outside main, on many screens
   fixtures/index.ts   hands each test its page objects by name ({ homePage }); specs import test and expect from here
   auth.setup.ts       setup project: signs in once, saves playwright/.auth/user.json (see "Auth")
@@ -32,11 +32,15 @@ tests/
     home/home.spec.ts
     dashboard/dashboard.spec.ts
     create-account/create-account.spec.ts
+    topics/           one spec per topic page, e.g. cryptography-and-codes.spec.ts
   pages/              one page object per screen: locators and actions, no expect
     SignInPage.ts  HomePage.ts  DashboardPage.ts  CreateAccountPage.ts  TaskBoardPage.ts
+    topics/           one page object per topic page, each with `readonly layout: TopicLayout`
+      CryptographyAndCodesPage.ts  VolcanicWorldsPage.ts  TimeAndCalendarsPage.ts
+  test-data/          files tests upload (sample-image.png); shared data once 2+ specs need it
 ```
 
-A page object is created the first time a test touches that screen, with only what that test uses (e.g. `CreateAccountPage` had just `heading` until Week 3 Day 1). A component (`tests/components/`) is a part that appears on 2+ screens. `NavBar` was added in Week 2 Day 1: the Main navigation is on every page, and the plan asks for it then. Today only `HomePage` includes it; other page objects add `readonly navBar` when a test of theirs needs the nav. `TopicLayout` (Week 2 Day 3) is the layout shared by the 10 topic pages; until topic page objects exist (Week 3, in `tests/pages/topics/`, each holding `readonly layout: TopicLayout`), tests get it from its own fixture. `Toast` (Week 3 Day 1) is the pop-up message; `CreateAccountPage` holds it as `readonly toast`, and other page objects add it when a test of theirs checks a toast.
+A page object is created the first time a test touches that screen, with only what that test uses (e.g. `CreateAccountPage` had just `heading` until Week 3 Day 1). A component (`tests/components/`) is a part that appears on 2+ screens. `NavBar` was added in Week 2 Day 1: the Main navigation is on every page, and the plan asks for it then. Today only `HomePage` includes it; other page objects add `readonly navBar` when a test of theirs needs the nav. `TopicLayout` (Week 2 Day 3) is the layout shared by the 10 topic pages; topic page objects (`tests/pages/topics/`, from Week 3 Day 3) hold it as `readonly layout: TopicLayout` and find their parts inside `layout.widget`. Its own fixture stays only for the dashboard loader test until a `SpaceExplorationPage` exists. `Toast` (Week 3 Day 1) is the pop-up message; `CreateAccountPage` holds it as `readonly toast`, and other page objects add it when a test of theirs checks a toast.
 
 ## Adding a test
 
@@ -68,7 +72,8 @@ page.getByLabel('Email');
 
 - `getByRole` for things you interact with (buttons, links, inputs); `getByText` for plain text (div, span, p).
 - Form fields: `getByLabel`, as the Locators page recommends for form controls. It reads the same for every field, and it fails if the label is missing or no longer linked to the field.
-- CSS only when no user-facing locator can exist. Our one case: the page's root element, `page.locator('html')` (`HomePage.htmlElement`), which has no role, label or text. ✘ `page.locator('.primary-nav button')` (a role and name exist) / ✔ `page.locator('html')`. Source: [Locators: CSS or XPath](https://playwright.dev/docs/locators#locate-by-css-or-xpath).
+- CSS only when no user-facing locator can exist. Our cases: the page's root element, `page.locator('html')` (`HomePage.htmlElement`), which has no role, label or text; and a container with no role, found by its **tag** and narrowed by what it contains: `communityFacts` = `locator('section').filter({ has: <heading> })`, `supplyPills` = `locator('span').filter({ has: <Remove button> })`. Never a bare tag without `filter`, never ids or classes. ✘ `page.locator('.primary-nav button')` (a role and name exist) / ✔ `page.locator('html')`. Source: [Locators: CSS or XPath](https://playwright.dev/docs/locators#locate-by-css-or-xpath), [Filtering locators](https://playwright.dev/docs/locators#filtering-locators).
+- A name or text with a fixed part and a changing part: match the fixed part (string for "contains", RegExp for starts/ends with), assert the full text in the spec. E.g. `TopicLayout.widget` uses `{ name: /interactive component/ }`. RegExp reference: [concepts](learning/concepts.md#regular-expressions-regexp-week-3-days-3-4).
 - Test IDs are stable but not user-facing: they still pass if the label is missing. Use them only when no user-facing locator is unique. Our case: the toast, `getByTestId('toast-notification')`: 6 elements have role `alert` and alerts have no name. Before choosing a test id, check whether it's an accessibility gap worth raising: [concepts: Asking developers for accessible locators](learning/concepts.md#asking-developers-for-accessible-locators-week-3-day-1).
 
 - `getByRole` searches the role the browser gives each element, not the HTML tag (e.g. an email input is a `textbox`; a `div` is `generic`, so use `getByText`). Full role table and how to find roles on any page: [concepts: ARIA and roles](learning/concepts.md#aria-roles-and-the-accessibility-tree-week-1-day-3). When the W3C table and the browser disagree, trust Playwright's page snapshot.
@@ -202,6 +207,8 @@ Source: [Best practices: make tests isolated](https://playwright.dev/docs/best-p
 
 - Valid data comes from a typed factory with overrides (`validAccount(overrides)`) that uses Faker; each test overrides only the field it tests, written by hand so the reader sees it.
 - The factory sits at the top of the spec that uses it; it moves to `tests/test-data/` when a second spec needs it.
+- A single test with no variations builds its data object inline (faker for filler, the value under test by hand); a factory comes once 2+ tests share the shape.
+- Files a test uploads live in `tests/test-data/` (`sample-image.png`); specs reach them with `path.join(__dirname, ...)`.
 - No `faker.seed()`. The one fixed user `user@test.com` is for sign-in only (read-only).
 - How it works: [concepts: Test data](learning/concepts.md#test-data-week-3-day-2). Why: [decision record 003](decisions/003-test-data.md).
 
@@ -223,6 +230,8 @@ async signIn(email: string, password: string): Promise<void> {}
 - Specs get page objects from fixtures (`async ({ homePage }) => ...`), never with `new`. Every page object has a fixture in `tests/fixtures/index.ts`. See "Fixtures" below.
 - Every user action goes through a page object method, even a single click (`homePage.navBar.openSignIn()`). Specs never call `click()` or `fill()` directly.
 - Anything a spec needs to check is a `readonly` Locator property on the page object; the spec asserts on it with a web-first assertion. Specs hold no locators of their own.
+- A locator that depends on a value the test passes in (which supply, which topic) is built **inside the action method** from its parameter (`pickSupplies(supplies)`, `openTopic(title)`), not stored as a property: the constructor runs before the test gives the value, and `readonly` can't be set later. Why: [concepts](learning/concepts.md#locators-that-depend-on-a-tests-value).
+- Topic page objects (`tests/pages/topics/`) hold `readonly layout: TopicLayout` and find every part inside `this.layout.widget`. `goto()` opens the topic by URL with `encodeURIComponent(title)`.
 - A page object stores the tab (`private readonly page: Page`) only if a method uses `this.page` later (e.g. `goto()`). Otherwise the constructor takes `page: Page` as a plain input.
 - Composition over inheritance: no `BasePage` or `BaseTest`. A part shared by many pages is a component that the page object builds in its own constructor and exposes as a property:
   ```ts
@@ -316,6 +325,7 @@ Why it works this way: [concepts: Environment variables and .env](learning/conce
 | Locator properties                 | what it is + kind of element; links use their text                                                                                              | `emailInput`, `signInButton`, `loginLink`, `darkModeButton`, `heading`                       |
 | Data type properties               | the value, not the element                                                                                                                      | `acceptTerms: boolean` (its locator: `termsCheckbox`), `fullName` (locator: `fullNameInput`) |
 | Shared component locators          | what it is, not what today's text says                                                                                                          | `toast.message`, not `toast.successMessage`                                                  |
+| Spec files                         | kebab-case, one per screen, in `tests/specs/<area>/`, mirroring `tests/pages/` ([DR 004](decisions/004-spec-naming.md))                         | `sign-in/sign-in.spec.ts`, `topics/cryptography-and-codes.spec.ts`                           |
 | Page object classes and files      | PascalCase + `Page`, file named the same                                                                                                        | `CreateAccountPage` in `CreateAccountPage.ts`                                                |
 | Components (part of a screen)      | PascalCase, no `Page` (you can't open it), in `tests/components/`                                                                               | `NavBar` in `NavBar.ts`; property on the page object: `navBar`                               |
 | Methods                            | camelCase (small first letter)                                                                                                                  | `toggleDarkMode()`, not `ToggleDarkMode()`                                                   |
@@ -343,6 +353,7 @@ Why the framework is shaped this way, one record per topic, in [decisions/](deci
 - [001. Week 1 tooling and workflow](decisions/001-week-1-tooling-and-workflow.md): PRs and squash merge, the three checking tools, check order, TypeScript pin, line endings
 - [002. Framework design](decisions/002-framework-design.md): fixtures, composition with no base classes, assertions in specs, pages mirror specs
 - [003. Test data](decisions/003-test-data.md): generated valid data with hand-written invalid values, one factory with overrides, no seed, the one fixed sign-in user
+- [004. Spec naming](decisions/004-spec-naming.md): one kebab-case spec per screen, topic pages each get their own spec in `specs/topics/`
 
 ## Official docs
 

@@ -18,6 +18,8 @@ Contents:
 - [CreateAccountPage](#createaccountpage) (`tests/pages/CreateAccountPage.ts`) (Week 3 Day 1)
 - [Toast](#toast) (`tests/components/Toast.ts`) (Week 3 Day 1)
 - [Create account spec](#create-account-spec) (`tests/specs/create-account/create-account.spec.ts`) (Week 3 Day 1)
+- [CryptographyAndCodesPage](#cryptographyandcodespage) (`tests/pages/topics/CryptographyAndCodesPage.ts`) (Week 3 Day 3)
+- [TimeAndCalendarsPage](#timeandcalendarspage) (`tests/pages/topics/TimeAndCalendarsPage.ts`) (Week 3 Day 4)
 
 ---
 
@@ -598,20 +600,23 @@ async openTopic(title: string): Promise<void> {
 export class TopicLayout {
   readonly loadingSpinner: Locator;
   readonly heading: Locator;
+  readonly widget: Locator;
 
   constructor(page: Page) {
     this.loadingSpinner = page
       .getByRole('status')
       .filter({ hasText: 'Loading...' });
     this.heading = page.getByRole('heading', { level: 1 });
+    this.widget = page.getByRole('region', { name: /interactive component/ });
   }
 }
 ```
 
-- What it is: a **component** (in `tests/components/`, no `Page` in the name): the layout all 10 topic pages share, at `/html/dashboard.html?topic=<title>`. Today it has only what a test uses: the loader and the title. From Week 3, topic page objects in `tests/pages/topics/` will hold it as `readonly layout: TopicLayout` (composition, like `homePage.navBar`).
+- What it is: a **component** (in `tests/components/`, no `Page` in the name): the layout all 10 topic pages share, at `/html/dashboard.html?topic=<title>`. It has only what tests use: the loader, the title and the widget. Topic page objects in `tests/pages/topics/` hold it as `readonly layout: TopicLayout` (composition, like `homePage.navBar`).
 - `constructor(page: Page)` [TS]: a plain input, not `private readonly page`: no method uses the tab later.
 - `getByRole('status')` [PW]: the loader is `<div class="loading-spinner" role="status">`. A status element gets no name from its text, so `{ name: 'Loading...' }` would find nothing. `.filter({ hasText: 'Loading...' })` keeps the status that contains that text, so a status inside a topic widget can't match.
 - `getByRole('heading', { level: 1 })` [PW]: the page's only `h1`, the topic title. No `name`, because the title is different on each topic; the spec checks which one.
+- `widget` (added Week 3 Day 3) [OURS]: each topic's interactive area, `<section aria-label="<title> interactive component">`. A `<section>` with an `aria-label` has the role `region`. `/interactive component/` [JS] is a RegExp (no quotes): it matches the words all 10 names share, so one locator works on every topic. Topic page objects find their inputs inside it: `this.layout.widget.getByLabel('Name')`. RegExp reference: [concepts](concepts.md#regular-expressions-regexp-week-3-days-3-4).
 
 ### Fixture
 
@@ -924,3 +929,147 @@ The other three follow one pattern: `validAccount({ ... })` with one invalid fie
 | `'terms not checked shows a terms error'`          | `validAccount({ acceptTerms: false })`                            | `termsError`    |
 
 - Why one invalid field: a failure then names one rule ([concepts](concepts.md#one-invalid-field-per-test)).
+
+---
+
+## CryptographyAndCodesPage
+
+**File:** `tests/pages/topics/CryptographyAndCodesPage.ts` (Week 3 Day 3). Spec: `tests/specs/topics/cryptography-and-codes.spec.ts`.
+
+**What it does:** the Cryptography & Codes topic. Its widget is the "Contribute a Fact" form: name, email, a textarea, a date input and an image upload with a preview. Only what's new is tested here; validation was covered on create account.
+
+### Type and properties
+
+```ts
+export type FactDetails = {
+  name: string;
+  email: string;
+  fact: string;
+  learnedOn: string;
+};
+
+export class CryptographyAndCodesPage {
+  readonly layout: TopicLayout;
+  readonly nameInput: Locator;
+  // emailInput, factInput, learnedOnInput, imageInput, submitButton
+  readonly imagePreview: Locator;
+  readonly communityFacts: Locator;
+
+  constructor(private readonly page: Page) {
+    this.layout = new TopicLayout(page);
+    this.nameInput = this.layout.widget.getByLabel('Name');
+    // ...the other inputs by label...
+    this.imagePreview = this.layout.widget.getByRole('img', {
+      name: 'Uploaded image preview',
+    });
+    this.communityFacts = this.layout.widget
+      .locator('section')
+      .filter({ has: page.getByRole('heading', { name: 'Community Facts' }) });
+  }
+```
+
+- `export type FactDetails` [TS]: the data `contributeFact` fills. All four are required (no `Partial`, no `?`): every test fills all four. Add `?` only when a test needs to leave one out.
+- `layout` [OURS]: the shared `TopicLayout`, built first, because every other locator starts from `this.layout.widget`.
+- `this.layout.widget.getByLabel(...)` [PW]: chaining: search only inside the widget, so a "Name" label anywhere else on the page can't match (strict mode). Partial label match, so the 📸 in "Upload Supporting Image" can be left out.
+- `getByRole('img', { name })` [PW]: an image's accessible name is its `alt` text.
+- `communityFacts` [OURS]: the section has no role or label, so: all `section` tags inside the widget (CSS), kept only if it **has** the "Community Facts" heading. ✘ the heading alone: the facts sit beside it, not inside it, so `toContainText(fact)` would fail. ✘ `getByRole('paragraph')`: many paragraphs on the page, and finding the text anywhere doesn't prove it landed in Community Facts.
+- `private readonly page` [TS]: stored because `goto()` uses `this.page`.
+
+### Methods
+
+```ts
+  async goto(): Promise<void> {
+    await this.page.goto(
+      `/html/dashboard.html?topic=${encodeURIComponent('Cryptography & Codes')}`,
+    );
+  }
+
+  async contributeFact(details: FactDetails): Promise<void> {
+    await this.nameInput.fill(details.name);
+    await this.emailInput.fill(details.email);
+    await this.factInput.fill(details.fact);
+    await this.learnedOnInput.fill(details.learnedOn);
+    await this.submitButton.click();
+  }
+
+  async uploadImage(filePath: string): Promise<void> {
+    await this.imageInput.setInputFiles(filePath);
+  }
+```
+
+- `goto()`: opens the topic directly; the dashboard spec already tests clicking a card. Template literal + `encodeURIComponent` turn `&` into `%26` ([concepts](concepts.md#opening-a-page-by-url-encodeuricomponent-and-template-literals)). Leading `/` = from `baseURL`.
+- `contributeFact` [OURS]: one user action (fill and submit), so one method. `fill` works on the textarea and the date input too; the date must be `YYYY-MM-DD`.
+- `uploadImage` [OURS]: separate from `contributeFact` because the preview appears as soon as a file is chosen, and submitting clears it. `setInputFiles` [PW] sets the file without the OS dialog.
+
+### The spec, in short
+
+- Test 1: `details` built first (faker for name, email, fact; the date written by hand because it's the value under test), `goto()`, `contributeFact(details)`, then `communityFacts` `toContainText(details.fact)` and the textarea and date `toHaveValue('')` (the app resets the form). The fact is kept in `details` because faker gives a new sentence on every call.
+- Test 2: `uploadImage(path.join(__dirname, '../../test-data/sample-image.png'))`, then `imagePreview` `toBeVisible()`. `tests/test-data/sample-image.png` is a 1×1 PNG.
+
+---
+
+## TimeAndCalendarsPage
+
+**File:** `tests/pages/topics/TimeAndCalendarsPage.ts` (Week 3 Day 4). Spec: `tests/specs/topics/time-and-calendars.spec.ts`.
+
+**What it does:** the Time & Calendars topic. Its widget, "Build Your Expedition", has a **native** `<select>` (transport) and a **custom** multi-select (supply checkboxes that add pills with ✕ buttons, max 3).
+
+(`VolcanicWorldsPage` has no walkthrough: it repeats this pattern with one slider; see [concepts: Inputs](concepts.md#inputs-textarea-date-range-file).)
+
+### Properties
+
+```ts
+this.transportSelect = this.layout.widget.getByRole('combobox', {
+  name: 'Choose your transport',
+});
+this.launchExpeditionButton = this.layout.widget.getByRole('button', {
+  name: 'Launch Expedition',
+});
+this.expeditionReportHeading = this.layout.widget.getByRole('heading', {
+  name: 'Expedition Report',
+});
+this.supplyCounter = this.layout.widget.getByText('Selected:');
+this.supplyPills = this.layout.widget
+  .locator('span')
+  .filter({ has: page.getByRole('button', { name: /^Remove / }) });
+```
+
+- `combobox` [PW]: the role of a native `<select>`; its name comes from the `<label>`. (`getByLabel('Choose your transport')` finds the same element.)
+- `'Launch Expedition'`: partial name match skips the 🚀.
+- `supplyCounter`: found by its fixed start "Selected:"; the spec checks the full text ("Selected: 1 of 3"). ✘ `getByText('Selected: 0 of 3')` stops matching once the number changes.
+- `supplyPills` [OURS]: a pill is a `<span>` with no role. Every pill contains one ✕ button named "Remove <supply>", so: the spans that have a button whose name starts with "Remove " (`/^Remove /`, RegExp, `^` = starts with). Counting them counts pills. ✘ `locator('span')` without the filter also counted the 8 checklist labels (received 10).
+
+### Methods
+
+```ts
+  async chooseTransport(transport: string): Promise<void> {
+    await this.transportSelect.selectOption({ label: transport });
+  }
+
+  async launchExpedition(): Promise<void> {
+    await this.launchExpeditionButton.click();
+  }
+
+  async pickSupplies(supplies: string[]): Promise<void> {
+    for (const supply of supplies) {
+      await this.layout.widget.getByRole('checkbox', { name: supply }).check();
+    }
+  }
+
+  async removeSupply(supply: string): Promise<void> {
+    await this.supplyPills
+      .filter({ hasText: supply })
+      .getByRole('button')
+      .click();
+  }
+```
+
+- `chooseTransport` [OURS]: `selectOption({ label })` [PW] matches only the exact visible label, emoji included: the test passes `'🚀 Rocket Ship'`.
+- `launchExpedition` [OURS]: one click, still a method: an intent method, not a generic wrapper. Separate from `chooseTransport` because a user can pick supplies in between.
+- `pickSupplies` [OURS]: `string[]` [TS] = array of strings. `for...of` [JS] with `await` ticks one after another. The checkbox locator is built **inside** the method because which checkbox depends on the test's value. `check()` [PW] ticks (safe to repeat), unlike `click()`. Partial name match, so `'Compass'` finds "🧭 Compass".
+- `removeSupply` [OURS]: the pill containing "Compass", then the one button inside it. ✘ `getByRole('button', { name: `Remove ${supply}` })` needs the emoji: "Remove Compass" is not part of "Remove 🧭 Compass".
+
+### The spec, in short
+
+- Test 1: `chooseTransport('🚀 Rocket Ship')`, `launchExpedition()`, then the report heading `toBeVisible()`. Without a transport the app shows an error toast and no report, so the report also proves the select worked.
+- Test 2: counter "Selected: 0 of 3"; `pickSupplies(['Research Books', 'Telescope'])`; counter "Selected: 2 of 3" and 2 pills; `removeSupply('Telescope')`; 1 pill and "Selected: 1 of 3". The counter catches a bug the pill count can't: a pill removed but its checkbox still ticked.
