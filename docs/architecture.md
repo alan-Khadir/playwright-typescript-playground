@@ -46,7 +46,7 @@ A page object is created the first time a test touches that screen, with only wh
 
 Example: a test that starts on the Task Board.
 
-1. **Spec:** `tests/specs/<screen it starts on>/`, e.g. `tests/specs/task-board/task-board.spec.ts`. Import `test` and `expect` from `../../fixtures`. One `test.describe` per file, tagged `@regression`.
+1. **Spec:** `tests/specs/<screen it starts on>/`, e.g. `tests/specs/task-board/task-board.spec.ts`. Import `test` and `expect` from `../../fixtures`. At least one `test.describe` per file, each tagged `@regression`; another only for different setup (signed out) or a separate feature of the same screen.
 2. **Page object:** if it exists (`TaskBoardPage.ts` does), add only the locators and methods your test needs. If not, create `tests/pages/<Name>Page.ts`. No `expect`.
 3. **Component:** only if the part is on 2+ screens. Goes in `tests/components/`, added as a property of each page object.
 4. **Fixture:** a new page object gets one in `tests/fixtures/index.ts`. Existing ones already have one.
@@ -294,7 +294,7 @@ Why it works this way: [concepts: Auth and storage state](learning/concepts.md#a
 ### Tags
 
 - `@smoke` = "is the app basically alive?": a few fast tests on the paths the app is useless without. From Week 9, CI runs only these on every PR; until then CI runs everything.
-- `@regression` = everything. Every test has it, set once on its `test.describe`: `test.describe('Sign in', { tag: '@regression' }, () => {`. From Week 9 it runs nightly on all browsers.
+- `@regression` = everything. Every test has it, set on each `test.describe`: `test.describe('Sign in', { tag: '@regression' }, () => {`. From Week 9 it runs nightly on all browsers.
 - **To decide on smoke, ask: "If only this test failed, would we block the merge?"** Yes → candidate for smoke. No → regression only.
 - A smoke test also needs both: (1) it covers a core path (sign in, the dashboard loads its topics, a topic opens), and (2) it's fast, with no slow setup. Aim for a handful; smoke must stay under a minute as the suite grows. Today: 3 tests.
 - `@smoke` goes on the test itself (`test('valid user reaches the dashboard', { tag: '@smoke' }, async (...)`); it adds to the describe's `@regression`.

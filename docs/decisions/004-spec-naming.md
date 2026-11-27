@@ -18,7 +18,7 @@ Ten topic pages share one layout (`TopicLayout`) and each gets its own page obje
 
 ### 2. Inside a spec
 
-- **Chose:** one `test.describe` per file, named as a user names the screen (`'Cryptography & Codes'`), tagged `@regression`. Test titles: the user's action, then the result (`'uploading an image shows a preview'`), as in [architecture: Naming](../architecture.md#naming).
+- **Chose:** at least one `test.describe` per file, each tagged `@regression`, named as a user names the screen (`'Cryptography & Codes'`). Add another describe only for different setup (signed out) or a separate feature of the same screen (`dashboard.spec.ts` and `home.spec.ts` have two). Test titles: the user's action, then the result (`'uploading an image shows a preview'`), as in [architecture: Naming](../architecture.md#naming).
 - **Benefit:** the report reads as "screen › what the user did and saw".
 - **Cost:** none beyond keeping titles honest when a test changes.
 

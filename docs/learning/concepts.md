@@ -1488,13 +1488,13 @@ Sources: [Actions (input)](https://playwright.dev/docs/input), [Assertions](http
 
 ### Inputs: textarea, date, range, file
 
-| Input          | Action [PW]                                  | Check [PW]                   | Watch out                                                                                                                                |
-| -------------- | -------------------------------------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `<textarea>`   | `fill('text')`                               | `toHaveValue('text')`        | Same as a text input.                                                                                                                    |
-| `type="date"`  | `fill('2026-11-25')`                         | `toHaveValue('2026-11-25')`  | Value is always `YYYY-MM-DD`; the **displayed** format follows the locale (UK `25/11/2026`). ✘ `fill('25/11/2026')` → _Malformed value_. |
-| `type="range"` | `fill(String(75))`                           | `toHaveValue('75')`          | `fill` takes a string: `String(value)` [JS] turns `75` into `'75'`. Role `slider`.                                                       |
-| `type="file"`  | `setInputFiles(path)`                        | the app's result (a preview) | Sets the file without the OS file dialog (Playwright can't drive that dialog).                                                           |
-| checkbox       | `check()` / `uncheck()` / `setChecked(bool)` | `toBeChecked()`              | `check()` is safe to repeat; `click()` toggles, so a second click unticks.                                                               |
+| Input          | Action [PW]                                  | Check [PW]                   | Watch out                                                                                                                                                                                                                                                                 |
+| -------------- | -------------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `<textarea>`   | `fill('text')`                               | `toHaveValue('text')`        | Same as a text input.                                                                                                                                                                                                                                                     |
+| `type="date"`  | `fill('2026-11-25')`                         | `toHaveValue('2026-11-25')`  | Value is always `YYYY-MM-DD`; the **displayed** format follows the locale (UK `25/11/2026`). ✘ `fill('25/11/2026')`: no error (Playwright 1.65); the browser drops the value to `''` and the test can still pass. See [Dates and locale](#dates-and-locale-week-3-day-5). |
+| `type="range"` | `fill(String(75))`                           | `toHaveValue('75')`          | `fill` takes a string: `String(value)` [JS] turns `75` into `'75'`. Role `slider`.                                                                                                                                                                                        |
+| `type="file"`  | `setInputFiles(path)`                        | the app's result (a preview) | Sets the file without the OS file dialog (Playwright can't drive that dialog).                                                                                                                                                                                            |
+| checkbox       | `check()` / `uncheck()` / `setChecked(bool)` | `toBeChecked()`              | `check()` is safe to repeat; `click()` toggles, so a second click unticks.                                                                                                                                                                                                |
 
 - **File paths:** `path.join(__dirname, '../../test-data/sample-image.png')`. `path` [Node] builds paths with the right separator; `__dirname` [Node] is the folder of the current file (works because our `package.json` is `"type": "commonjs"`). ✘ `'tests/test-data/x.png'` is relative to wherever the command runs. Test files live in `tests/test-data/`.
 - C#/Selenium: file upload = `SendKeys(@"C:\path\file.png")` on the input.
@@ -1563,6 +1563,15 @@ Sources: [Actions (input)](https://playwright.dev/docs/input), [Assertions](http
 - The supplies counter and the pill count are both checked because they catch **different** bugs (a pill removed but its checkbox still ticked shows only in the counter).
 - Random results (the slider game's target) aren't asserted; controlling randomness comes later.
 
+### Dates and locale (Week 3 Day 5)
+
+- **`fill` checks before, not after** [PW]: it waits until the input is visible, enabled and editable, sets the value and fires `input`. It never reads the value back, so a rejected value (wrong date format, `maxlength`) passes silently.
+- **Typing vs `fill`:** a person types into the date control's day/month/year boxes in their **locale** (the browser's language and region setting; UK = day first) and the browser stores `2026-11-25`. `fill` skips the boxes and writes the stored value, so it must be `YYYY-MM-DD`.
+- **Recommended:** `fill` the ISO value; assert the outcome where the app uses the date, else `toHaveValue`; pin `locale` and `timezoneId` in the config so CI matches local runs; test other locales only where the app formats dates itself; drive a custom date picker by role and name.
+- **Find weak tests:** break the data on purpose (the Week 3 Day 5 drill). If nothing goes red, nothing asserts it.
+- **Interview line:** "I fill a native date input with the ISO value because it skips the locale-dependent display, and I assert the outcome because `fill` doesn't confirm the value stuck."
+- C#/Selenium: `SendKeys` types into the boxes like a user, so it depends on the locale. Docs: [MDN: date value](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input/date#value), [Playwright: locale](https://playwright.dev/docs/emulation#locale--timezone).
+
 ### Interview line
 
 "I locate form controls by their labels and scope them inside the component they belong to, assert values with `toHaveValue` and visible text with `toHaveText`, and when an element has no role I find it by what it contains, a heading or a button, rather than by an id. Locators that depend on test data are built inside the action method, and I loop with `for...of` so every `await` is respected."
@@ -1622,6 +1631,7 @@ await expect(card).toContainText(/\d+pts/); // a card's "🏆 20pts" badge
 - ✘ `{ name: '/interactive component/' }`: quotes make it a **string**, slashes included → no match, timeout. ✔ `{ name: /interactive component/ }`.
 - Case-sensitive by default: `/remove/` doesn't match "Remove". Add `i` if case doesn't matter.
 - Escape dots, brackets and `?` in URLs and prices: ✘ `/dashboard.html?topic/` ✔ `/dashboard\.html\?topic/`.
+- The file filter on the command line is a RegExp too: ✘ `npx playwright test .\tests\specs\topics\...` (`\t` = tab, `\s` = space → "No tests found") ✔ forward slashes, or part of the name: `npx playwright test cryptography`.
 - Keep patterns short; a long clever pattern is hard to review. If you need one, a comment says what it matches.
 
 5. **When to use / not:** use when text has a fixed part and a changing part, or you need start/end anchors. Don't use when a plain string or `{ exact: true }` says the same thing.
